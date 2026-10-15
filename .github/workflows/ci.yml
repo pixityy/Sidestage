@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # Pushing a version tag (v0.1.0) also publishes a GitHub release from this run's builds.
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -129,3 +131,52 @@ jobs:
             cargo check --locked --workspace --all-targets --target "$target"
             echo "::endgroup::"
           done
+
+  release:
+    # Runs only for version tags, after every platform built, tested and packaged. Publishes the
+    # same archives CI just built, plus their SHA-256 checksums, with the notes for this version
+    # from CHANGELOG.md.
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, msrv]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that the tag matches the version
+        run: |
+          version="$(sed -nE 's/^version = "([^"]+)".*/\1/p' Cargo.toml | head -n 1)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
+            exit 1
+          fi
+      - name: Extract the release notes
+        # The section between "## <tag>" and the next "## " heading.
+        run: |
+          awk -v tag="$GITHUB_REF_NAME" '
+            /^## / { if (found) exit; if ($2 == tag) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no '## $GITHUB_REF_NAME' section"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: sidestage-*
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --title "Sidestage ${GITHUB_REF_NAME#v}" \
+            --notes-file notes.md
