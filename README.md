@@ -207,3 +207,21 @@ cargo test --workspace        # run the tests
 The head model follows C. P. Brown and R. O. Duda, "A structural model for binaural sound
 synthesis", IEEE Trans. Speech and Audio Processing 6(5), 1998. The rear and elevation cues use
 Blauert's directional bands.
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  <https://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in
+Sidestage by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without
+any additional terms or conditions.
+
+Release binaries also contain third-party Rust crates under their own permissive licenses (MIT,
+Apache-2.0, BSD, Zlib, ISC, BSL-1.0, MPL-2.0 and similar) and egui's built-in fonts, which are under
+the SIL Open Font License 1.1 and the Ubuntu Font Licence 1.0.
