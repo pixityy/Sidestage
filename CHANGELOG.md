@@ -2,6 +2,11 @@
 
 Each `## v<version>` section is also the text of that version's GitHub release.
 
+## Unreleased
+
+* Confirmed working on Windows 11 with real music: Spotify spatialized while playing Valorant.
+* README: demo video and screenshots.
+
 ## v0.1.0 - 2026-10-15
 
 The first release. Sidestage takes the sound of one app, usually your music player, and plays it

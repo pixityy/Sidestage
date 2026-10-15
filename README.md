@@ -9,12 +9,45 @@ ducking turns the music down while the game is loud.
 
 **Headphones required.** The effect is binaural and does not work on speakers.
 
+<p align="center">
+  <a href="docs/media/sidestage-demo.mp4">
+    <img src="docs/media/demo-poster.jpg" width="820"
+         alt="Sidestage moving Spotify around the listener while Valorant plays (click to watch)">
+  </a>
+  <br>
+  <sub><b>▶ Watch the demo, with sound:</b> Spotify moving around your head while Valorant plays
+  normally. Wear headphones.</sub>
+</p>
+
 | System | Status (version 0.1) |
 |---|---|
-| Windows 11 | Audio backend tested on real hardware with a test tone. Not yet tested with real music apps. |
+| Windows 11 | **Tested.** Spotify spatialized while playing Valorant, with the original hidden and the game untouched. |
 | Windows 10, version 2004 or newer | May work, untested. Sidestage warns that capturing one app is not officially supported before build 20348. |
-| macOS 14.2 or newer | The code type-checks and its OS-independent unit tests pass. Not yet built or run on a Mac. |
-| Linux with PipeWire or PulseAudio | The code type-checks and its OS-independent unit tests pass. Not yet built or run on Linux. |
+| macOS 14.2 or newer | Builds and passes its tests in CI on macOS. Not yet tried with real music on a Mac. |
+| Linux with PipeWire or PulseAudio | Builds and passes its tests in CI on Linux. Not yet tried with real music on a Linux desktop. |
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/media/screenshot-main.png" alt="Presets and the radar"></td>
+    <td><img src="docs/media/screenshot-ducking.png" alt="Sound and ducking controls"></td>
+  </tr>
+  <tr>
+    <td align="center">Drag the music around your head, or pick a preset</td>
+    <td align="center">Sound controls and ducking with live game level</td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/screenshot-light.png" alt="Light theme"></td>
+    <td><img src="docs/media/screenshot-diagnostics.png" alt="Diagnostics window"></td>
+  </tr>
+  <tr>
+    <td align="center">Light theme</td>
+    <td align="center">Diagnostics: latency, dropouts, clock drift</td>
+  </tr>
+</table>
+
+The screenshots use the app's demo mode (`sidestage --demo`), which shows simulated apps.
 
 ## Getting started
 
