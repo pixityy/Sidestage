@@ -1,0 +1,5 @@
+# Same edition as the workspace, so running rustfmt on a single file formats it the way
+# `cargo fmt` (and CI's `cargo fmt --all --check`) does.
+edition = "2024"
+max_width = 120
+use_small_heuristics = "Max"

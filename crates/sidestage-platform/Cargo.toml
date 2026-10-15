@@ -1,0 +1,61 @@
+[package]
+name = "sidestage-platform"
+description = "Per-application audio capture, original-output silencing and playback for Windows, macOS and Linux"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rtrb.workspace = true
+directories.workspace = true
+
+# --- Windows: WASAPI process loopback + session volume control -------------------------------
+[target.'cfg(windows)'.dependencies]
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Wdk_System_SystemServices",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Multimedia",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+] }
+
+# --- macOS: Core Audio process taps + private aggregate device -------------------------------
+[target.'cfg(target_os = "macos")'.dependencies]
+# Private serial queue for Core Audio property-listener blocks.
+dispatch2 = { version = "0.3.1", default-features = false, features = ["std"] }
+libc = "0.2"
+block2 = "0.6"
+objc2 = "0.6.5"
+objc2-foundation = "0.3.2"
+objc2-core-foundation = "0.3.2"
+objc2-core-audio = "0.3.2"
+objc2-core-audio-types = "0.3.2"
+
+# --- Linux: PulseAudio native protocol (works on PulseAudio and pipewire-pulse) --------------
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+pulseaudio = "0.3.1"
+
+# The Windows live-test tools (examples/win_tone.rs plays its test tone through cpal).
+[target.'cfg(windows)'.dev-dependencies]
+cpal = "0.18.2"

@@ -1,0 +1,14 @@
+[package]
+name = "sidestage-dsp"
+description = "Binaural 'music behind you' renderer: spherical-head HRTF, room, ducking"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

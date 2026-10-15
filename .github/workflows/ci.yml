@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Core Audio process taps need macOS 14.2. crates/sidestage/build.rs raises the app binary to
+  # it anyway; setting it here builds every crate (and the test binaries) for the same floor.
+  # Non-Apple targets ignore it.
+  MACOSX_DEPLOYMENT_TARGET: "14.2"
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            toolchain_targets: x86_64-pc-windows-msvc
+            artifact: windows-x86_64
+          - name: macOS
+            os: macos-latest
+            target: aarch64-apple-darwin
+            # The app bundle is universal: make-app.sh also builds the Intel half.
+            toolchain_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            artifact: macos-universal
+          - name: Linux
+            # The oldest supported image, so the release binary runs on glibc 2.35 and newer.
+            # No system packages are needed: winit, glutin, Wayland and X11 are all loaded at
+            # run time, and the audio backend speaks the PulseAudio protocol in Rust.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            toolchain_targets: x86_64-unknown-linux-gnu
+            artifact: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.toolchain_targets }}
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --locked --workspace --all-targets --target ${{ matrix.target }} -- -D warnings
+      # Unit and integration tests only: none needs audio hardware or a display. The Windows live
+      # tests are examples (win_e2e, win_tone, ...), which `cargo test` builds but never runs.
+      - name: Test
+        run: cargo test --locked --workspace --target ${{ matrix.target }}
+      - name: Build release
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Read the version
+        id: version
+        shell: bash
+        run: |
+          version="$(cargo metadata --locked --format-version 1 --no-deps \
+            | sed -nE 's/.*"name":"sidestage","version":"([^"]+)".*/\1/p')"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target/${{ matrix.target }}/release/sidestage.exe -DestinationPath dist/Sidestage-${{ steps.version.outputs.version }}-${{ matrix.artifact }}.zip
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        # Ad-hoc signed, universal Sidestage.app and its zip, both written to dist/.
+        run: bash packaging/macos/make-app.sh --universal --out dist
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        # A tarball keeps the executable bit, which upload-artifact's zip would drop.
+        run: |
+          mkdir -p dist
+          tar -czf dist/Sidestage-${{ steps.version.outputs.version }}-${{ matrix.artifact }}.tar.gz \
+            -C target/${{ matrix.target }}/release sidestage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidestage-${{ steps.version.outputs.version }}-${{ matrix.artifact }}
+          if-no-files-found: error
+          # The files are already compressed.
+          compression-level: 0
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+
+  msrv:
+    # Checks the `rust-version` in Cargo.toml (eframe/egui 0.36 need 1.95) against every
+    # platform's code: the Apple and Windows targets are type-checked from Linux, nothing is linked.
+    name: MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read rust-version
+        id: msrv
+        shell: bash
+        run: |
+          version="$(sed -nE 's/^rust-version = "([^"]+)".*/\1/p' Cargo.toml)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+          targets: x86_64-unknown-linux-gnu,aarch64-apple-darwin,x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        shell: bash
+        run: |
+          for target in x86_64-unknown-linux-gnu aarch64-apple-darwin x86_64-pc-windows-msvc; do
+            echo "::group::$target"
+            cargo check --locked --workspace --all-targets --target "$target"
+            echo "::endgroup::"
+          done

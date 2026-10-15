@@ -1,0 +1,8 @@
+# Windows MSVC builds link the C runtime statically, so sidestage.exe runs on a clean Windows
+# install without the Visual C++ Redistributable (vcruntime140.dll). Other targets are not
+# affected.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

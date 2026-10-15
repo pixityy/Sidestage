@@ -1,0 +1,32 @@
+[package]
+name = "sidestage"
+description = "Put one app's audio (your music) behind you in 3D while your game audio stays untouched"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+sidestage-dsp.workspace = true
+sidestage-platform.workspace = true
+anyhow.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+directories.workspace = true
+env_logger = { version = "0.11.11", default-features = false, features = ["auto-color", "humantime"] }
+# glow instead of the default wgpu renderer: smaller binary, no shader compiler, works on old GPUs.
+# `links` (webbrowser) is left out on purpose: it needs libshlwapi, which the gnu toolchains lack.
+eframe = { version = "0.36.2", default-features = false, features = ["glow", "default_fonts", "wayland", "x11"] }
+# Screenshot mode writes PNGs; the pure-Rust encoder is small.
+png = "0.18.1"
+
+[target.'cfg(unix)'.dependencies]
+# Ctrl+C / SIGTERM handling for the headless `run` command.
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# eframe disables winit's default features; these restore proper GNOME Wayland decorations and
+# runtime loading of libwayland (see research verify_rust-stack.json).
+winit = { version = "0.30.13", default-features = false, features = ["wayland-csd-adwaita", "wayland-dlopen"] }
