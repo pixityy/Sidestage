@@ -4,7 +4,7 @@ members = ["crates/sidestage-dsp", "crates/sidestage-platform", "crates/sidestag
 default-members = ["crates/sidestage"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 repository = "https://github.com/pixityy/Sidestage"
@@ -25,6 +25,12 @@ directories = "6.0.0"
 opt-level = 1
 
 [profile.dev.package."*"]
+opt-level = 3
+
+# The DSP crate as well ("*" covers only dependencies). This also makes its tests, which render
+# and check long stretches of audio sample by sample, about 8x faster (on a desktop, the slowest
+# two test files drop from 100 s to 12 s). Debug assertions and overflow checks stay on.
+[profile.dev.package.sidestage-dsp]
 opt-level = 3
 
 [profile.release]

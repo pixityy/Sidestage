@@ -2494,7 +2494,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sidestage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "directories",
@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "sidestage-dsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2520,7 +2520,7 @@ dependencies = [
 
 [[package]]
 name = "sidestage-platform"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "block2 0.6.2",
