@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, SyncSender};
 
 use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Media::Audio::{
@@ -19,6 +19,7 @@ use windows::core::{BOOL, GUID, PCWSTR, Ref, implement};
 
 use super::capture::Gain;
 use super::sessions::Manager;
+use crate::{AppKey, SourceConfig};
 
 /// Event context passed with every volume change Sidestage makes, so its own changes can be
 /// told apart from the user's and the app's in `OnSimpleVolumeChanged`.
@@ -29,16 +30,22 @@ pub const SIDESTAGE_CONTEXT: GUID = GUID::from_u128(0x5d1e_57a6_e0b1_4c8a_9a6f_3
 pub enum Event {
     /// The owner wants the session stopped and restored.
     Stop,
+    /// A new (already validated) source list; the sender is signalled once it is installed.
+    SetSources(Vec<SourceConfig>, SyncSender<()>),
+    SetIgnore(Vec<AppKey>),
     DefaultOutputChanged,
     DevicesChanged,
     SessionCreated,
-    /// Someone other than Sidestage changed a hushed session's volume or mute.
+    /// Someone other than Sidestage changed a hushed session's volume or mute. `hush` names the
+    /// source's hush state, so a late event of a source that was removed is ignored.
     VolumeChanged {
+        hush: u64,
         instance: Arc<str>,
         volume: f32,
         muted: bool,
     },
     SessionGone {
+        hush: u64,
         instance: Arc<str>,
     },
     Ducking(bool),
@@ -149,6 +156,7 @@ pub fn duck_events(tx: Sender<Event>) -> IAudioVolumeDuckNotification {
 /// Watches one hushed session.
 #[implement(IAudioSessionEvents)]
 pub struct HushedEvents {
+    hush: u64,
     instance: Arc<str>,
     tx: Sender<Event>,
     gain: Arc<Gain>,
@@ -174,7 +182,12 @@ impl IAudioSessionEvents_Impl for HushedEvents_Impl {
             // the next packet, the supervisor re-hushes and reopens.
             self.gain.close();
         }
-        let _ = self.tx.send(Event::VolumeChanged { instance: self.instance.clone(), volume, muted: mute.as_bool() });
+        let _ = self.tx.send(Event::VolumeChanged {
+            hush: self.hush,
+            instance: self.instance.clone(),
+            volume,
+            muted: mute.as_bool(),
+        });
         Ok(())
     }
     fn OnChannelVolumeChanged(&self, _n: u32, _v: *const f32, _c: u32, _ctx: *const GUID) -> windows::core::Result<()> {
@@ -185,21 +198,22 @@ impl IAudioSessionEvents_Impl for HushedEvents_Impl {
     }
     fn OnStateChanged(&self, state: AudioSessionState) -> windows::core::Result<()> {
         if state == AudioSessionStateExpired {
-            let _ = self.tx.send(Event::SessionGone { instance: self.instance.clone() });
+            let _ = self.tx.send(Event::SessionGone { hush: self.hush, instance: self.instance.clone() });
         }
         Ok(())
     }
     fn OnSessionDisconnected(&self, _reason: AudioSessionDisconnectReason) -> windows::core::Result<()> {
-        let _ = self.tx.send(Event::SessionGone { instance: self.instance.clone() });
+        let _ = self.tx.send(Event::SessionGone { hush: self.hush, instance: self.instance.clone() });
         Ok(())
     }
 }
 
 pub fn hushed_events(
+    hush: u64,
     instance: Arc<str>,
     tx: Sender<Event>,
     gain: Arc<Gain>,
     applied: Arc<AtomicU32>,
 ) -> IAudioSessionEvents {
-    HushedEvents { instance, tx, gain, applied }.into()
+    HushedEvents { hush, instance, tx, gain, applied }.into()
 }

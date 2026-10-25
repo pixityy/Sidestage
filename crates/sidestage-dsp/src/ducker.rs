@@ -40,10 +40,11 @@ impl Ducker {
     }
 
     /// Advances by `dt_s` seconds with sidechain peak `level` (linear) and returns the
-    /// reduction to apply. Disabled ducking releases to 0 at the release rate, so switching it
-    /// off mid-duck does not jump.
+    /// reduction to apply. `level` already holds only the triggers that are on (the game for
+    /// `enabled`, voice chat for `under_voice`). Disabled ducking releases to 0 at the release
+    /// rate, so switching it off mid-duck does not jump.
     pub fn update(&mut self, level: f32, d: &Ducking, dt_s: f32) -> f32 {
-        let target = if d.enabled { static_curve(gain_to_db(level), d) } else { 0.0 };
+        let target = if d.enabled || d.under_voice { static_curve(gain_to_db(level), d) } else { 0.0 };
         let coef = |ms: f32| 1.0 - (-dt_s / (ms.max(0.1) * 1e-3)).exp();
         if target >= self.reduction_db && target > 0.0 {
             // Still at least as loud as what we are ducking for: attack and re-arm the hold.

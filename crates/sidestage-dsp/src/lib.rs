@@ -7,13 +7,16 @@
 //! - [`Settings`]: every user-facing parameter, serializable, with [`Preset`]s and [`DuckMode`]s.
 //! - [`SharedParams`]: lock-free hand-off of `Settings` from the UI thread to the audio thread,
 //!   plus [`Meters`] going the other way.
-//! - [`Spatializer`]: the real-time processor.
+//! - [`Spatializer`]: one source's real-time renderer.
+//! - [`MasterBus`]: the safety limiter on the mix of all sources.
 
 mod biquad;
 mod delay;
 mod ducker;
 mod head;
+mod leveler;
 mod limiter;
+mod master;
 mod params;
 mod presets;
 mod renderer;
@@ -21,6 +24,7 @@ mod reverb;
 mod smoothing;
 mod voice;
 
+pub use master::MasterBus;
 pub use params::{Ducking, MeterReading, Meters, Room, Settings, SharedParams};
-pub use presets::{DuckMode, Preset, make_footstep_safe};
+pub use presets::{DuckMode, Preset, PresetKind, make_footstep_safe};
 pub use renderer::{Spatializer, render_offline};

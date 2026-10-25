@@ -4,14 +4,17 @@
 //! Threads: the caller's thread (winit's STA) never touches COM, and waits for the backend's
 //! threads only briefly (a slow audio system gets the previous app list, or a session that is
 //! still starting). List and recovery requests run on a platform worker in the MTA, which also
-//! puts back volumes left by an earlier run the moment their app opens audio again; each
-//! session runs a supervisor thread (MTA) that owns the session volumes and notifications,
-//! plus real-time capture/render threads (MTA + MMCSS).
+//! puts back volumes left by an earlier run the moment their app opens audio again. The session
+//! runs a supervisor thread (MTA) that owns every source's session volumes, the notifications
+//! and the output, plus real-time threads (MTA + MMCSS): one render thread that mixes every
+//! source, one capture thread per source, and one peak-only capture per app the ducking
+//! sidechain listens to.
 //!
 //! Files: `com` (apartments, handles), `procs` (process tree, names), `sessions` (endpoints,
-//! sessions, app list), `capture` (process loopback, gain stage), `render` (output), `hush`
-//! (session-volume hiding and its journal), `guardian` (crash restore helper), `notify` (COM
-//! notification sinks and registrations), `session` (the supervisor).
+//! sessions, app list), `capture` (process loopback, gain stage), `render` (output and mixer),
+//! `hush` (session-volume hiding and its journal), `guardian` (crash restore helper), `notify`
+//! (COM notification sinks and registrations), `sidechain` (what ducking listens to), `session`
+//! (the supervisor).
 //!
 //! Not offered: `HideMethod::ParkOn`. Routing an app to another output needs the undocumented
 //! `IAudioPolicyConfig`, and resetting the route does not move streams the app opened while
@@ -29,6 +32,7 @@ pub(crate) use procs::match_key;
 mod render;
 mod session;
 mod sessions;
+mod sidechain;
 
 use std::collections::HashSet;
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -38,7 +42,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use windows::Win32::Media::Audio::IMMDeviceEnumerator;
 
-use crate::{AudioApp, HideMethod, OutputDevice, Platform, ProcessorFactory, Session, SessionConfig, Support};
+use crate::{AudioApp, HideMethod, OutputDevice, Platform, Session, SessionConfig, Support};
 use com::{Poster, Worker};
 use notify::SessionWatch;
 use procs::Names;
@@ -237,14 +241,11 @@ impl Platform for WindowsPlatform {
         ]
     }
 
-    fn start(&mut self, config: SessionConfig, processor: ProcessorFactory) -> anyhow::Result<Box<dyn Session>> {
+    fn start(&mut self, config: SessionConfig) -> anyhow::Result<Box<dyn Session>> {
         if let Support::Unsupported(why) = self.support() {
             anyhow::bail!(why);
         }
-        if let HideMethod::ParkOn(_) = config.hide {
-            anyhow::bail!("moving an app to another output is not supported on Windows; use the default hide method");
-        }
-        session::start(config, processor, self.build)
+        session::start(config, self.build)
     }
 
     fn recover(&mut self) -> anyhow::Result<Vec<String>> {

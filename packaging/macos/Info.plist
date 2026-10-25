@@ -36,7 +36,7 @@
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>Sidestage plays the app you pick, usually your music player, through your headphones as if it came from behind you. To do that, macOS has to let it capture that app's audio. If you turn on ducking, Sidestage also measures how loud your other audio is, so it can turn the music down when your game gets loud. Nothing is recorded, saved or sent anywhere.</string>
+	<string>Sidestage plays the apps you pick, such as your music, a podcast or voice chat, through your headphones from the places you put them around you. To do that, macOS has to let it capture those apps' audio. If you turn on ducking, Sidestage also measures how loud your other audio is, so it can turn those apps down when your game gets loud. Nothing is recorded, saved or sent anywhere.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sidestage never uses a microphone. macOS may ask because some headsets combine headphones and a microphone in one device; Sidestage keeps the microphone part switched off.</string>
 </dict>

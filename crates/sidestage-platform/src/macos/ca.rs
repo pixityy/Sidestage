@@ -169,6 +169,20 @@ pub fn get_string(object: AudioObjectID, selector: u32, scope: u32) -> anyhow::R
     Ok(NonNull::new(raw.cast_mut()).map(|p| unsafe { CFRetained::from_raw(p) }.to_string()))
 }
 
+/// Reads a property that is a CFArray of CFStrings (an aggregate's tap list). Like strings,
+/// the HAL returns the array retained ("the caller is responsible for releasing the returned
+/// CFObject"), so it is adopted, never retained again. Items that are not strings are skipped.
+pub fn get_string_array(object: AudioObjectID, selector: u32, scope: u32) -> anyhow::Result<Vec<String>> {
+    // SAFETY: a raw pointer may hold any value, including the zeroed null.
+    let raw: *const CFArray<CFType> = unsafe { get(object, selector, scope)? };
+    let Some(raw) = NonNull::new(raw.cast_mut()) else {
+        return Ok(Vec::new());
+    };
+    // SAFETY: a non-null CFArray handed to us with a +1 retain count.
+    let array = unsafe { CFRetained::from_raw(raw) };
+    Ok(array.iter().filter_map(|item| item.downcast_ref::<CFString>().map(|s| s.to_string())).collect())
+}
+
 /// Writes a fixed-size property.
 ///
 /// # Safety

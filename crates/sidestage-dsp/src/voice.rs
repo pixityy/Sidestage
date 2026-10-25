@@ -37,6 +37,10 @@ const AIR: Band = Band { hz: 10_000.0, q: 0.6, db: -1.2 };
 
 const BASS_HZ: f32 = 150.0;
 const PRESENCE_HZ: f32 = 3200.0;
+/// Speech clarity: a broad bell over the band that carries most of speech intelligibility
+/// (consonants, 1.2-5 kHz at -3 dB for this Q).
+const CLARITY_HZ: f32 = 2500.0;
+const CLARITY_Q: f32 = 0.8;
 /// "Muffle" fades from a plain low-pass to fully open between these cutoffs, so 20 kHz is
 /// exactly transparent at every sample rate.
 const MUFFLE_OPEN_FROM_HZ: f32 = 16_000.0;
@@ -51,7 +55,7 @@ const FAR_HIGHPASS_LN: f32 = 1.1; // x3
 const FAR_TONE_DB: f32 = 6.0;
 
 const CUES: usize = 5;
-const TONES: usize = 4;
+const TONES: usize = 5;
 
 #[derive(Clone, Copy, Debug)]
 struct Band {
@@ -73,6 +77,7 @@ struct Params {
     lp_ln: f32,
     bass_db: f32,
     presence_db: f32,
+    clarity_db: f32,
 }
 
 impl Params {
@@ -86,6 +91,7 @@ impl Params {
             lp_ln: s.lowpass_hz.max(1.0).ln(),
             bass_db: s.bass_db,
             presence_db: s.presence_dip_db,
+            clarity_db: s.clarity_db,
         }
     }
 }
@@ -122,7 +128,7 @@ pub struct Voice {
     air_target: SvfCoefs,
     gain: Ramp,
     gain_target: f32,
-    /// High-pass, muffle low-pass, bass shelf, presence dip.
+    /// High-pass, muffle low-pass, bass shelf, presence dip, clarity.
     tone: [Svf2; TONES],
     tone_targets: [SvfCoefs; TONES],
 }
@@ -231,6 +237,7 @@ impl Voice {
             || (t.hp_ln - p.hp_ln).abs() > FAR_HIGHPASS_LN
             || (t.bass_db - p.bass_db).abs() > FAR_TONE_DB
             || (t.presence_db - p.presence_db).abs() > FAR_TONE_DB
+            || (t.clarity_db - p.clarity_db).abs() > FAR_TONE_DB
     }
 
     /// Moves the smoothed parameters one sub-block of `n` frames toward `settings` and updates
@@ -252,6 +259,7 @@ impl Voice {
         approach(&mut p.lp_ln, t.lp_ln, c, 1e-4);
         approach(&mut p.bass_db, t.bass_db, c, 1e-3);
         approach(&mut p.presence_db, t.presence_db, c, 1e-3);
+        approach(&mut p.clarity_db, t.clarity_db, c, 1e-3);
         if self.p != self.computed {
             self.compute_targets();
         }
@@ -294,6 +302,7 @@ impl Voice {
             SvfCoefs::lowpass_open(fs, lp_hz, FRAC_1_SQRT_2, open),
             SvfCoefs::low_shelf(fs, BASS_HZ, FRAC_1_SQRT_2, p.bass_db),
             SvfCoefs::bell(fs, PRESENCE_HZ, 1.0, p.presence_db),
+            SvfCoefs::bell(fs, CLARITY_HZ, CLARITY_Q, p.clarity_db),
         ];
         self.computed = p;
     }

@@ -1,7 +1,7 @@
 //! The watchdog: a copy of Sidestage that restores the user's audio if Sidestage dies.
 //!
-//! The capture sink belongs to the sound server, not to our connection, so it survives a crash
-//! and the music app would stay silent. The watchdog holds the read end of a pipe whose only
+//! The capture sinks belong to the sound server, not to our connections, so they survive a crash
+//! and the source apps would stay silent. The watchdog holds the read end of a pipe whose only
 //! write end is in the Sidestage process; when that process exits for any reason (even
 //! SIGKILL) the kernel closes it, the watchdog reads EOF and undoes what the journal records.
 //! On a clean stop the session restores and clears the journal first, so the watchdog finds
@@ -80,7 +80,7 @@ pub fn run_helper(args: &[String]) -> i32 {
     // SAFETY: setting SIG_IGN for these signals is async-signal-safe and has no preconditions.
     // A closing terminal or Ctrl+C must not stop the watchdog before it has done its job, and
     // neither must SIGTERM: `pkill sidestage` or a logout signals both processes at once, and
-    // the watchdog is what gives the music app its sound back when Sidestage dies that way. It
+    // the watchdog is what gives the apps their sound back when Sidestage dies that way. It
     // still exits on its own as soon as Sidestage is gone and the restore is done.
     unsafe {
         libc::signal(libc::SIGINT, libc::SIG_IGN);
@@ -109,27 +109,38 @@ pub fn run_helper(args: &[String]) -> i32 {
             return 1;
         }
     };
-    // The sound server may be restarting at the same moment (e.g. at logout); retry briefly.
+    // Every source's capture sink. The sound server may be restarting at the same moment (e.g.
+    // at logout); retry briefly, keeping the sinks already undone.
+    let mut left = record.sinks;
     for attempt in 1..=10 {
-        let result = Conn::connect("recovery")
-            .and_then(|mut c| control::restore_sink(&mut c, &record.sink_name, &record.streams));
-        match result {
-            Ok(lines) => {
-                for line in lines {
-                    log::info!("linux helper: {line}");
+        if !left.is_empty() {
+            match Conn::connect("recovery") {
+                Ok(mut conn) => {
+                    left.retain(|sink| match control::restore_sink(&mut conn, &sink.sink_name, &sink.streams) {
+                        Ok(lines) => {
+                            for line in lines {
+                                log::info!("linux helper: {line}");
+                            }
+                            false
+                        }
+                        Err(e) => {
+                            log::warn!("linux helper: restore attempt {attempt} of {} failed: {e:#}", sink.sink_name);
+                            true
+                        }
+                    })
                 }
-                if journal.load().ok().flatten().is_some_and(|r| r.session == *session)
-                    && let Err(e) = journal.clear()
-                {
-                    log::error!("linux helper: {e:#}");
-                }
-                return 0;
-            }
-            Err(e) => {
-                log::warn!("linux helper: restore attempt {attempt} failed: {e:#}");
-                std::thread::sleep(Duration::from_millis(500));
+                Err(e) => log::warn!("linux helper: restore attempt {attempt} failed: {e:#}"),
             }
         }
+        if left.is_empty() {
+            if journal.load().ok().flatten().is_some_and(|r| r.session == *session)
+                && let Err(e) = journal.clear()
+            {
+                log::error!("linux helper: {e:#}");
+            }
+            return 0;
+        }
+        std::thread::sleep(Duration::from_millis(500));
     }
     1
 }

@@ -35,6 +35,14 @@ pub struct Settings {
     pub ducking: Ducking,
     /// Pass the music through untouched (still hidden from its original output).
     pub bypass: bool,
+    /// Speech clarity: a broad bell around 2.5 kHz, dB in -6..=6 (voice presets boost it).
+    pub clarity_db: f32,
+    /// Evens out loud and quiet talkers: 0 = off, 1 = strong levelling, in 0..=1. A gentle
+    /// compressor with automatic make-up gain, applied before the 3D rendering.
+    pub leveler: f32,
+    /// This source is voice chat. Other sources with [`Ducking::under_voice`] turn down while it
+    /// is talking.
+    pub voice_chat: bool,
 }
 
 /// Room character for the reverb.
@@ -96,6 +104,10 @@ pub struct Ducking {
     pub hold_ms: f32,
     /// How fast the music comes back, ms in 50..=3000.
     pub release_ms: f32,
+    /// Also turn this source down while a voice-chat source ([`Settings::voice_chat`]) is
+    /// talking, with the same threshold, depth and timing. Works even when `enabled` (ducking
+    /// under the game) is off.
+    pub under_voice: bool,
 }
 
 impl Default for Ducking {
@@ -138,10 +150,12 @@ impl Settings {
         k.attack_ms = fix(k.attack_ms, 1.0, 200.0, dk.attack_ms);
         k.hold_ms = fix(k.hold_ms, 0.0, 1000.0, dk.hold_ms);
         k.release_ms = fix(k.release_ms, 50.0, 3000.0, dk.release_ms);
+        self.clarity_db = fix(self.clarity_db, -6.0, 6.0, d.clarity_db);
+        self.leveler = fix(self.leveler, 0.0, 1.0, d.leveler);
         self
     }
 
-    const WORDS: usize = 20;
+    const WORDS: usize = 23;
 
     fn to_words(self) -> [u32; Self::WORDS] {
         let k = self.ducking;
@@ -165,7 +179,10 @@ impl Settings {
             k.hold_ms.to_bits(),
             k.release_ms.to_bits(),
             u32::from(self.bypass),
-            0,
+            u32::from(k.under_voice),
+            self.clarity_db.to_bits(),
+            self.leveler.to_bits(),
+            u32::from(self.voice_chat),
         ]
     }
 
@@ -191,8 +208,12 @@ impl Settings {
                 attack_ms: f(15),
                 hold_ms: f(16),
                 release_ms: f(17),
+                under_voice: w[19] != 0,
             },
             bypass: w[18] != 0,
+            clarity_db: f(20),
+            leveler: f(21),
+            voice_chat: w[22] != 0,
         }
     }
 }

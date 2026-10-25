@@ -1,5 +1,5 @@
-//! Sidestage: put one app's audio (usually your music) behind you in 3D while your game audio
-//! stays exactly as it is.
+//! Sidestage: put your apps' audio around you in 3D (music behind you, a podcast on the left,
+//! voice chat on the right) while your game audio stays exactly as it is.
 //!
 //! `sidestage` opens the window; `sidestage --help` lists the command-line tools.
 

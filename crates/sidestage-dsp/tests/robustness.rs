@@ -3,7 +3,7 @@
 mod common;
 
 use common::*;
-use sidestage_dsp::{DuckMode, Ducking, Preset, Room, Settings};
+use sidestage_dsp::{DuckMode, Ducking, MasterBus, Preset, Room, Settings};
 
 /// A float that is usually in a wide range but sometimes NaN, infinite or absurd.
 fn wild(rng: &mut Rng, lo: f32, hi: f32) -> f32 {
@@ -37,8 +37,12 @@ fn random_settings(rng: &mut Rng) -> Settings {
             attack_ms: wild(rng, 1.0, 200.0),
             hold_ms: wild(rng, 0.0, 1000.0),
             release_ms: wild(rng, 50.0, 3000.0),
+            under_voice: rng.next_u64().is_multiple_of(2),
         },
         bypass: rng.next_u64().is_multiple_of(8),
+        clarity_db: wild(rng, -6.0, 6.0),
+        leveler: wild(rng, 0.0, 1.0),
+        voice_chat: rng.next_u64().is_multiple_of(2),
     }
 }
 
@@ -69,13 +73,19 @@ fn hammer(fs: u32, seconds: f32, seed: u64) {
         if rng.next_u64().is_multiple_of(3) {
             params.set(random_settings(&mut rng));
         }
-        let sidechain = match rng.next_u64() % 10 {
+        let mut level = || match rng.next_u64() % 10 {
             0 => f32::NAN,
             1 => -1.0,
             2 => f32::INFINITY,
+            3 => 0.0,
             _ => rng.range(0.0, 1.5),
         };
-        sp.process(&input, &mut output, sidechain);
+        let (game, voice) = (level(), level());
+        if voice == 0.0 {
+            sp.process(&input, &mut output, game);
+        } else {
+            sp.process_with_voice(&input, &mut output, game, voice);
+        }
         for (i, v) in output.iter().enumerate() {
             assert!(v.is_finite() && v.abs() <= 1.0, "fs {fs}, sample {} of a {len}-sample call: {v}", done + i);
         }
@@ -141,11 +151,23 @@ fn preset_changes_crossfade_without_clicks() {
     let quiet = |p: Preset| Settings { ducking: DuckMode::Off.ducking(), ..p.settings() };
     let (mut sp, params) = spatializer(quiet(Preset::BehindYou), FS);
     let w = 2.0 * std::f64::consts::PI * 1000.0 / FS as f64;
-    let tone: Vec<f32> = (0..7 * FS as usize).map(|i| 0.2 * (w * i as f64).sin() as f32).collect();
+    let tone: Vec<f32> = (0..12 * FS as usize).map(|i| 0.2 * (w * i as f64).sin() as f32).collect();
     let input = interleave(&tone, &tone);
     let mut out = vec![0.0; input.len()];
-    let order =
-        [Preset::DeskSpeaker, Preset::Above, Preset::NextRoom, Preset::Lounge, Preset::FarAway, Preset::BehindYou];
+    // Between music and voice presets too: the leveller and clarity switch in and out.
+    let order = [
+        Preset::DeskSpeaker,
+        Preset::VoiceLeft,
+        Preset::Above,
+        Preset::RadioComms,
+        Preset::NextRoom,
+        Preset::OverShoulder,
+        Preset::Lounge,
+        Preset::PodcastLeft,
+        Preset::FarAway,
+        Preset::VoiceRight,
+        Preset::BehindYou,
+    ];
     for (k, (i, o)) in input.chunks(2 * FS as usize).zip(out.chunks_mut(2 * FS as usize)).enumerate() {
         if k > 0 {
             params.set(quiet(order[(k - 1) % order.len()]));
@@ -187,4 +209,48 @@ fn starting_while_music_plays_does_not_click() {
             }
         }
     }
+}
+
+#[test]
+fn master_bus_survives_hostile_mixes() {
+    let mut rng = Rng::new(11);
+    let mut bus = MasterBus::new(48_000);
+    let mut input = Vec::new();
+    let mut output = Vec::new();
+    for _ in 0..3000 {
+        let len = (rng.next_u64() % 2049) as usize;
+        let level = [0.1, 1.0, 8.0, 100.0][(rng.next_u64() % 4) as usize];
+        input.clear();
+        for _ in 0..len {
+            input.push(match rng.next_u64() % 3000 {
+                0 => f32::NAN,
+                1 => f32::NEG_INFINITY,
+                2 => f32::MAX,
+                3 => 1e-40,
+                _ => level * rng.white(),
+            });
+        }
+        output.clear();
+        output.resize(len + (rng.next_u64() % 3) as usize, f32::NAN);
+        bus.process(&input, &mut output);
+        assert!(output.iter().all(|v| v.is_finite() && v.abs() <= 0.891_3), "a {len}-sample call");
+    }
+}
+
+#[test]
+fn v0_1_settings_load_with_the_new_fields_defaulted() {
+    // A config saved by 0.1 has no clarity, leveller, voice chat or under-voice fields: it keeps
+    // sounding exactly as before, and its music now turns down while voice chat talks.
+    let old = serde_json::json!({
+        "azimuth_deg": 150.0, "elevation_deg": 0.0, "distance_m": 2.0, "width_deg": 60.0,
+        "volume_db": -3.0, "lowpass_hz": 18000.0, "highpass_hz": 30.0, "bass_db": 0.0,
+        "presence_dip_db": -3.0, "room": "Small", "reverb_db": -12.0, "bypass": false,
+        "ducking": { "enabled": true, "threshold_db": -42.0, "depth_db": 12.0, "band_dip_db": 9.0,
+                     "attack_ms": 10.0, "hold_ms": 250.0, "release_ms": 450.0 }
+    });
+    let s: Settings = serde_json::from_value(old).unwrap();
+    assert_eq!((s.clarity_db, s.leveler, s.voice_chat), (0.0, 0.0, false));
+    assert!(s.ducking.under_voice);
+    assert_eq!(DuckMode::matching(&s.ducking), Some(DuckMode::Competitive));
+    assert_eq!(s.sanitized(), s);
 }

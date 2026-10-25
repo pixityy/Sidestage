@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
     use std::time::{Duration, Instant};
 
     use anyhow::Context;
-    use sidestage_platform::{HideMethod, Processor, SessionConfig};
+    use sidestage_platform::{HideMethod, Processor, SessionConfig, SourceConfig};
 
     #[derive(Default)]
     struct Acc {
@@ -35,6 +35,13 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    struct Pass;
+    impl Processor for Pass {
+        fn process(&mut self, input: &[f32], output: &mut [f32], _sidechain_peak: f32) {
+            output.copy_from_slice(input);
+        }
+    }
+
     let mut args = std::env::args().skip(1);
     let needle = args.next().context("usage: win_probe <app> [seconds] [output id]")?.to_lowercase();
     let seconds: u64 = args.next().map(|s| s.parse()).transpose()?.unwrap_or(5);
@@ -50,10 +57,19 @@ fn main() -> anyhow::Result<()> {
 
     let acc = Arc::new(Mutex::new(Acc::default()));
     let shared = acc.clone();
-    let session = platform.start(
-        SessionConfig { app: app.key, output, hide: HideMethod::KeepOriginal, sidechain: false },
-        Arc::new(move |_| Box::new(Meter(shared.clone()))),
-    )?;
+    // The probe's own output is silence; the master passes it through.
+    let session = platform.start(SessionConfig {
+        output,
+        sidechain: false,
+        sidechain_ignore: Vec::new(),
+        sources: vec![SourceConfig {
+            id: 1,
+            app: app.key,
+            hide: HideMethod::KeepOriginal,
+            processor: Arc::new(move |_| Box::new(Meter(shared.clone()))),
+        }],
+        master: Arc::new(|_| Box::new(Pass)),
+    })?;
     let db = |sum: f64, n: u64| 10.0 * (sum / n.max(1) as f64).max(1e-20).log10();
     let end = Instant::now() + Duration::from_secs(seconds);
     while Instant::now() < end {

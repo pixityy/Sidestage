@@ -1,8 +1,9 @@
-//! Control-plane operations on a [`Conn`]: listing, loading the capture sink, moving streams,
-//! and undoing it all (on stop, from the watchdog, and in the startup sweep).
+//! Control-plane operations on a [`Conn`]: listing, loading capture sinks, moving streams,
+//! and undoing it all (when a source stops, from the watchdog, and in the startup sweep).
 
 use std::collections::BTreeSet;
 use std::ffi::CString;
+use std::fmt;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow, bail};
@@ -62,11 +63,31 @@ pub fn set_default_sink(conn: &mut Conn, name: &str) -> Result<(), CallError> {
     conn.ack(&Command::SetDefaultSink(name))
 }
 
-/// Loads the capture sink and returns its module index. Tries the per-server argument
-/// variants in order (see [`modargs::null_sink_args`]).
-pub fn load_capture_sink(conn: &mut Conn, kind: &ServerKind, sink_name: &str) -> anyhow::Result<u32> {
+/// The server does not let clients load modules, so no source can be captured however often
+/// it is retried. Found in an error chain with [`is_module_loading_denied`].
+#[derive(Debug)]
+pub struct ModuleLoadingDenied;
+
+impl fmt::Display for ModuleLoadingDenied {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(
+            "the sound server does not let apps load modules (on PipeWire this is \
+             `pulse.allow-module-loading = false`), so Sidestage cannot capture an app",
+        )
+    }
+}
+
+impl std::error::Error for ModuleLoadingDenied {}
+
+pub fn is_module_loading_denied(e: &anyhow::Error) -> bool {
+    e.chain().any(|c| c.is::<ModuleLoadingDenied>())
+}
+
+/// Loads a capture sink and returns its module index. Tries the per-server argument variants in
+/// order (see [`modargs::null_sink_args`]); `label` names the source's app in its description.
+pub fn load_capture_sink(conn: &mut Conn, kind: &ServerKind, sink_name: &str, label: &str) -> anyhow::Result<u32> {
     let mut last = None;
-    for args in modargs::null_sink_args(kind, sink_name) {
+    for args in modargs::null_sink_args(kind, sink_name, label) {
         let params =
             protocol::LoadModuleParams { name: c"module-null-sink".to_owned(), arguments: Some(cstring(&args)?) };
         match conn.request::<protocol::LookupReply>(&Command::LoadModule(params)) {
@@ -77,10 +98,7 @@ pub fn load_capture_sink(conn: &mut Conn, kind: &ServerKind, sink_name: &str) ->
             Err(CallError::Server(code)) => {
                 log::warn!("pulse: module-null-sink {args} was refused: {code}");
                 if code == PulseError::AccessDenied {
-                    bail!(
-                        "the sound server does not let apps load modules (on PipeWire this is \
-                         `pulse.allow-module-loading = false`), so Sidestage cannot capture one app"
-                    );
+                    return Err(ModuleLoadingDenied.into());
                 }
                 last = Some(code);
             }
@@ -205,22 +223,23 @@ fn is_module_of(m: &protocol::ModuleInfo, sink_name: &str, owner: Option<u32>) -
     modargs::created_sink(&args, m.index, sink_name, owner)
 }
 
-/// Removes every Sidestage capture sink except `keep` (a live instance's), moving the apps on it
-/// back. `journal` supplies original sinks for the sink it describes. Modules whose sink is not
-/// listed (yet) are removed as well.
+/// Removes every Sidestage capture sink except those in `keep` (a live session's), moving the
+/// apps on them back. `journal` supplies original sinks for the sinks it describes. Modules
+/// whose sink is not listed (yet) are removed as well.
 pub fn sweep(
     conn: &mut Conn,
     journal: Option<&routing::RoutingJournal>,
-    keep: Option<&str>,
+    keep: &BTreeSet<&str>,
 ) -> anyhow::Result<Vec<String>> {
     let mut leftovers: BTreeSet<String> = sinks(conn)?.into_iter().filter(|s| s.is_capture()).map(|s| s.name).collect();
     leftovers.extend(null_sink_modules(conn)?.iter().filter_map(module_sink));
-    if let Some(keep) = keep {
-        leftovers.remove(keep);
-    }
+    leftovers.retain(|name| !keep.contains(name.as_str()));
     let mut lines = Vec::new();
     for name in leftovers {
-        let tracked = journal.filter(|j| j.sink_name == name).map(|j| j.streams.as_slice()).unwrap_or_default();
+        let tracked = journal
+            .and_then(|j| j.sinks.iter().find(|s| s.sink_name == name))
+            .map(|s| s.streams.as_slice())
+            .unwrap_or_default();
         log::info!("pulse: removing leftover capture sink {name}");
         lines.extend(restore_sink(conn, &name, tracked)?);
         lines.push("Removed a virtual output that an earlier Sidestage run left behind.".to_owned());

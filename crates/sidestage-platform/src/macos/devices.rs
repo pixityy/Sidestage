@@ -112,6 +112,11 @@ pub fn output_channels(id: AudioObjectID) -> anyhow::Result<Vec<usize>> {
         .context("reading the output channel layout")
 }
 
+/// Channels of each input stream (a headset or interface microphone), in stream order.
+pub fn input_channels(id: AudioObjectID) -> anyhow::Result<Vec<usize>> {
+    ca::stream_channels(id, kAudioDevicePropertyStreamConfiguration, INPUT).context("reading the input channel layout")
+}
+
 /// Fails unless every output stream carries 32-bit float samples, the only format the IOProc
 /// writes. (The HAL converts for its clients, so this only fails for unusual devices.)
 pub fn check_output_formats(id: AudioObjectID) -> anyhow::Result<()> {

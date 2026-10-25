@@ -1,28 +1,36 @@
 //! Linux backend over the PulseAudio native protocol, which both real PulseAudio and PipeWire's
 //! pipewire-pulse speak (pure Rust via the `pulseaudio` crate; no libpulse at build or run time).
 //!
-//! * **Capture + hide**: a `module-null-sink` with a random per-session name; the music app's
+//! * **Capture + hide, per source**: a `module-null-sink` with a random name; the source app's
 //!   sink-inputs are moved onto it, so the user no longer hears them, and its `.monitor` is
-//!   recorded (`no_move`, 10 ms fragments, 48 kHz float stereo).
-//! * **Output**: a playback stream to the chosen (or default) sink, fed from the drift bridge
-//!   by the [`Processor`](crate::Processor).
-//! * **Sidechain**: per-stream peak meters on everything else playing on that sink.
+//!   recorded on a connection of its own (`no_move`, 10 ms fragments, 48 kHz float stereo) into
+//!   the source's drift bridge.
+//! * **Output**: one playback stream to the chosen (or default) sink. Its real-time thread pulls
+//!   every source's bridge through that source's [`Processor`](crate::Processor), sums them and
+//!   runs the master processor on the sum. Sources are added and removed while it plays. If the
+//!   server puts it on a capture sink (feedback), it is muted until it is moved off.
+//! * **Sidechain**: per-stream peak meters on everything else playing on that sink, except the
+//!   sources' apps and the user's ignore list.
 //! * **Undo**: moves persist (stream-restore / WirePlumber); moving a stream back to the
 //!   *current* default clears the saved route, other streams go back to their original sink.
 //!   A journal, a watchdog process and the startup sweep cover crashes.
 //!
-//! The protocol-independent parts (`env`, `modargs`, `pcm`, `routing`) are plain Rust with
-//! unit tests that run on every OS.
+//! The protocol-independent parts (`env`, `mixer`, `modargs`, `pcm`, `routing`, `sources`) are
+//! plain Rust with unit tests that run on every OS.
 
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
 mod env;
+mod mixer;
 mod modargs;
 mod pcm;
 mod routing;
+mod sources;
 
 #[cfg(target_os = "linux")]
 mod audio;
+#[cfg(target_os = "linux")]
+mod capture;
 #[cfg(target_os = "linux")]
 mod conn;
 #[cfg(target_os = "linux")]
@@ -77,9 +85,7 @@ mod platform {
     use anyhow::Context;
 
     use crate::journal::Journal;
-    use crate::{
-        AppKey, AudioApp, HideMethod, OutputDevice, Platform, ProcessorFactory, Session, SessionConfig, Support,
-    };
+    use crate::{AudioApp, HideMethod, OutputDevice, Platform, Session, SessionConfig, Support};
 
     use super::conn::{Conn, is_dead_connection};
     use super::modargs::ServerKind;
@@ -99,7 +105,7 @@ mod platform {
         /// Control connection for the picker, opened on first use and reopened after errors.
         ctl: Option<Conn>,
         kind: Option<ServerKind>,
-        /// Sidestage and its parent processes: never offered as the music app.
+        /// Sidestage and its parent processes: never offered as a source.
         exclude: BTreeSet<u32>,
     }
 
@@ -161,7 +167,7 @@ mod platform {
             Ok(routing::group_apps(&streams, &self.exclude)
                 .into_iter()
                 .map(|g| AudioApp {
-                    key: AppKey(g.key),
+                    key: g.key,
                     name: g.name,
                     detail: g.detail,
                     pids: g.pids,
@@ -190,10 +196,10 @@ mod platform {
             vec![(HideMethod::Auto, "Move the app to Sidestage's hidden capture output".to_owned())]
         }
 
-        fn start(&mut self, config: SessionConfig, processor: ProcessorFactory) -> anyhow::Result<Box<dyn Session>> {
+        fn start(&mut self, config: SessionConfig) -> anyhow::Result<Box<dyn Session>> {
             // The session opens its own connections; drop ours so a dead one is not reused.
             self.ctl = None;
-            session::start(config, processor)
+            session::start(config)
         }
 
         fn recover(&mut self) -> anyhow::Result<Vec<String>> {
@@ -216,8 +222,9 @@ mod platform {
                     return Ok(Vec::new());
                 }
             };
-            let lines =
-                control::sweep(conn, record.as_ref().filter(|_| live.is_none()), live.map(|r| r.sink_name.as_str()))?;
+            // A live session's sinks (including one it is creating right now) are left alone.
+            let keep: BTreeSet<&str> = live.iter().flat_map(|r| &r.sinks).map(|s| s.sink_name.as_str()).collect();
+            let lines = control::sweep(conn, record.as_ref().filter(|_| live.is_none()), &keep)?;
             if record.is_some() && live.is_none() {
                 journal.clear()?;
             }

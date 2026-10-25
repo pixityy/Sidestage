@@ -1,8 +1,8 @@
 //! WASAPI process-loopback capture.
 //!
-//! A process-loopback client captures one process tree (`INCLUDE`) or everything except one
-//! tree (`EXCLUDE`), after the target's session volume. Facts measured on Windows 11 that shape
-//! this code:
+//! A process-loopback client captures one process tree (`INCLUDE`), after its session volume:
+//! a source's app, or an app the ducking sidechain listens to. Facts measured on Windows 11 that
+//! shape this code:
 //! - `GetMixFormat`/`GetDevicePeriod`/`GetCurrentPadding` return `E_NOTIMPL`: we pick the format
 //!   (float32 stereo at the output device's rate, converted by the engine).
 //! - Packets are always 10 ms and the queue holds only ~3 of them. A late reader loses audio
@@ -25,8 +25,8 @@ use windows::Win32::Media::Audio::{
     AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0, AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
     AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS, ActivateAudioInterfaceAsync, IActivateAudioInterfaceAsyncOperation,
     IActivateAudioInterfaceCompletionHandler, IActivateAudioInterfaceCompletionHandler_Impl, IAudioCaptureClient,
-    IAudioClient, PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
-    VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, WAVEFORMATEX,
+    IAudioClient, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE, VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
+    WAVEFORMATEX,
 };
 use windows::Win32::Media::Multimedia::WAVE_FORMAT_IEEE_FLOAT;
 use windows::Win32::System::Com::BLOB;
@@ -35,7 +35,7 @@ use windows::Win32::System::Threading::WaitForMultipleObjects;
 use windows::Win32::System::Variant::VT_BLOB;
 use windows::core::{HRESULT, IUnknown, Interface, Ref, implement};
 
-use super::com::{Handle, Mmcss, Mta};
+use super::com::{Handle, Mmcss, Mta, panic_message};
 use crate::bridge::BridgeProducer;
 use crate::{AtomicLevel, peak};
 
@@ -44,8 +44,6 @@ use crate::{AtomicLevel, peak};
 pub enum Target {
     /// This process and all its descendants.
     Include(u32),
-    /// Everything except this process and its descendants.
-    Exclude(u32),
 }
 
 #[implement(IActivateAudioInterfaceCompletionHandler)]
@@ -63,7 +61,6 @@ impl IActivateAudioInterfaceCompletionHandler_Impl for ActivationDone_Impl {
 pub fn activate(target: Target) -> anyhow::Result<IAudioClient> {
     let (pid, mode) = match target {
         Target::Include(p) => (p, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE),
-        Target::Exclude(p) => (p, PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE),
     };
     // On the heap: if the activation times out, Windows may still read them when it completes,
     // so they are leaked then rather than freed.
@@ -130,9 +127,9 @@ pub fn float_stereo(rate: u32) -> WAVEFORMATEX {
     }
 }
 
-/// Level control between the capture and the bridge, set from control threads.
+/// Level control between a source's capture and its bridge, set from control threads.
 ///
-/// The music app's session runs at -120 dB while hidden, so the capture is multiplied by a large
+/// The source app's sessions run at -120 dB while hidden, so the capture is multiplied by a large
 /// makeup gain. Whenever the real session volume may not match the makeup (while settling,
 /// after someone else moved the slider) the gate is closed and the output fades to silence.
 /// As a last line of defence, any block that would come out above +12 dBFS is replaced by
@@ -233,61 +230,150 @@ impl Fader {
     }
 }
 
-/// Peak levels of the sidechain ("everything except the music").
+/// Most apps the sidechain listens to at once (one capture each).
+pub const SIDECHAIN_SLOTS: usize = 32;
+
+/// Peak levels of the sidechain (the game: every app except the sources, the ignored apps and
+/// Sidestage). Each listened app's capture thread reports into its own slot.
 #[derive(Debug, Default)]
 pub struct SidechainLevels {
-    /// Peak of the latest packet; the render thread reads it for the ducker.
-    pub now: AtomicLevel,
     /// Peak hold for the status display.
     pub hold: AtomicLevel,
+    slots: [AtomicLevel; SIDECHAIN_SLOTS],
+}
+
+impl SidechainLevels {
+    /// The latest packet peak of the app in `slot`. Real-time safe.
+    #[inline]
+    pub fn report(&self, slot: usize, peak: f32) {
+        if let Some(s) = self.slots.get(slot) {
+            s.store(peak);
+            self.hold.raise(peak);
+        }
+    }
+
+    /// The loudest app's latest packet peak, which the render thread hands to every processor.
+    /// Computed by the reader, so two apps reporting at once cannot leave a stale maximum.
+    /// Real-time safe.
+    #[inline]
+    pub fn now(&self) -> f32 {
+        self.slots.iter().map(AtomicLevel::load).fold(0.0, f32::max)
+    }
+
+    /// Forgets the app in `slot` (its capture stopped): a stale level would keep the sources
+    /// ducked.
+    pub fn clear(&self, slot: usize) {
+        self.report(slot, 0.0);
+    }
 }
 
 /// Where a capture thread delivers its audio.
 pub enum Sink {
-    /// The music: gain stage, then the bridge.
-    Music { producer: BridgeProducer, gain: Arc<Gain> },
-    /// The sidechain: peak levels only.
-    Sidechain(Arc<SidechainLevels>),
+    /// A source's app: gain stage, then the source's bridge.
+    Source { producer: BridgeProducer, gain: Arc<Gain> },
+    /// An app the sidechain listens to: peak levels only.
+    Sidechain { levels: Arc<SidechainLevels>, slot: usize },
 }
 
-/// Starts a capture thread and waits until its client is running. `stop` is a manual-reset
-/// event that ends the thread.
-pub fn spawn(
-    target: Target,
-    rate: u32,
-    sink: Sink,
+/// A running capture thread. Stopping it hands the sink back, so a source keeps its bridge and
+/// processor (and the tail ringing out of it) when its app restarts.
+pub struct Capture {
     stop: Arc<Handle>,
-) -> anyhow::Result<JoinHandle<anyhow::Result<()>>> {
+    thread: Option<JoinHandle<(anyhow::Result<()>, Sink)>>,
+}
+
+/// A capture that did not start, with its sink when it could be recovered.
+pub struct SpawnError {
+    pub error: anyhow::Error,
+    pub sink: Option<Sink>,
+}
+
+impl Capture {
+    /// The thread ended on its own (its error is returned by [`Capture::stop`]).
+    pub fn finished(&self) -> bool {
+        self.thread.as_ref().is_none_or(JoinHandle::is_finished)
+    }
+
+    /// Stops the thread. Returns the error it reported, if any, and the sink (`None` if the
+    /// thread panicked).
+    pub fn stop(mut self) -> (Option<String>, Option<Sink>) {
+        self.halt()
+    }
+
+    fn halt(&mut self) -> (Option<String>, Option<Sink>) {
+        self.stop.set();
+        let Some(t) = self.thread.take() else {
+            return (None, None);
+        };
+        match t.join() {
+            Ok((r, sink)) => (r.err().map(|e| format!("{e:#}")), Some(sink)),
+            Err(p) => (Some(format!("the capture thread panicked: {}", panic_message(&p))), None),
+        }
+    }
+}
+
+impl Drop for Capture {
+    fn drop(&mut self) {
+        self.halt();
+    }
+}
+
+/// Starts a capture thread and waits until its client is running.
+pub fn spawn(target: Target, rate: u32, sink: Sink) -> Result<Capture, SpawnError> {
+    let (mut capture, ready) = launch(target, rate, sink)?;
+    match ready.recv_timeout(Duration::from_secs(8)) {
+        Ok(Ok(())) => Ok(capture),
+        Ok(Err(error)) => {
+            let (_, sink) = capture.halt();
+            Err(SpawnError { error, sink })
+        }
+        Err(_) => {
+            // Stuck inside the audio system: let the thread end on its own whenever it can.
+            capture.stop.set();
+            drop(capture.thread.take());
+            Err(SpawnError { error: anyhow!("the capture thread did not start in time"), sink: None })
+        }
+    }
+}
+
+/// Starts a capture thread without waiting for it: a client that fails to start shows up as
+/// [`Capture::finished`], with its error from [`Capture::stop`].
+pub fn spawn_unwaited(target: Target, rate: u32, sink: Sink) -> Result<Capture, SpawnError> {
+    launch(target, rate, sink).map(|(c, _)| c)
+}
+
+type Ready = mpsc::Receiver<anyhow::Result<()>>;
+
+fn launch(target: Target, rate: u32, sink: Sink) -> Result<(Capture, Ready), SpawnError> {
+    let stop = match Handle::event(true) {
+        Ok(h) => Arc::new(h),
+        Err(error) => return Err(SpawnError { error, sink: Some(sink) }),
+    };
     let (ready_tx, ready_rx) = mpsc::sync_channel::<anyhow::Result<()>>(1);
     let name = match sink {
-        Sink::Music { .. } => "sidestage-capture",
-        Sink::Sidechain(_) => "sidestage-sidechain",
+        Sink::Source { .. } => "sidestage-capture",
+        Sink::Sidechain { .. } => "sidestage-sidechain",
     };
-    let thread = thread::Builder::new()
-        .name(name.to_owned())
-        .spawn(move || {
-            let r = run(target, rate, sink, &stop, &ready_tx);
-            if let Err(e) = &r {
-                // Also reaches the spawner if we failed before reporting ready.
-                let _ = ready_tx.try_send(Err(anyhow!("{e:#}")));
-            }
-            r
-        })
-        .context("spawning the capture thread")?;
-    match ready_rx.recv_timeout(Duration::from_secs(8)) {
-        Ok(Ok(())) => Ok(thread),
-        Ok(Err(e)) => {
-            let _ = thread.join();
-            Err(e)
+    let thread_stop = stop.clone();
+    let spawned = thread::Builder::new().name(name.to_owned()).spawn(move || {
+        let mut sink = sink;
+        let r = run(target, rate, &mut sink, &thread_stop, &ready_tx);
+        if let Err(e) = &r {
+            // Also reaches the spawner if we failed before reporting ready.
+            let _ = ready_tx.try_send(Err(anyhow!("{e:#}")));
         }
-        Err(_) => Err(anyhow!("the capture thread did not start in time")),
+        (r, sink)
+    });
+    match spawned {
+        Ok(t) => Ok((Capture { stop, thread: Some(t) }, ready_rx)),
+        Err(e) => Err(SpawnError { error: anyhow!(e).context("spawning the capture thread"), sink: None }),
     }
 }
 
 fn run(
     target: Target,
     rate: u32,
-    mut sink: Sink,
+    sink: &mut Sink,
     stop: &Handle,
     ready: &mpsc::SyncSender<anyhow::Result<()>>,
 ) -> anyhow::Result<()> {
@@ -310,11 +396,10 @@ fn run(
     let _mmcss = Mmcss::pro_audio();
     unsafe { client.Start() }.context("starting the capture")?;
     let _ = ready.try_send(Ok(()));
-    let result = capture_loop(&cap, rate, &mut sink, &mut scratch, &mut fader, &event, stop);
+    let result = capture_loop(&cap, rate, sink, &mut scratch, &mut fader, &event, stop);
     let _ = unsafe { client.Stop() };
-    if let Sink::Sidechain(levels) = &sink {
-        // A stale level would keep the music ducked.
-        levels.now.store(0.0);
+    if let Sink::Sidechain { levels, slot } = sink {
+        levels.clear(*slot);
     }
     result
 }
@@ -357,7 +442,7 @@ fn capture_loop(
                 let delta = qpc.saturating_sub(prev);
                 if delta > expected + expected / 2 && delta < 10_000_000 {
                     let lost = ((delta - expected) * u64::from(rate) / 10_000_000).min(u64::from(rate) / 10) as usize;
-                    if let Sink::Music { producer, gain } = sink {
+                    if let Sink::Source { producer, gain } = sink {
                         producer.push_silence(lost);
                         gain.gaps.fetch_add(1, Ordering::Relaxed);
                     }
@@ -377,20 +462,16 @@ fn capture_loop(
                     buf.copy_from_slice(src);
                 }
                 match sink {
-                    Sink::Music { producer, gain } => {
+                    Sink::Source { producer, gain } => {
                         fader.apply(gain, buf);
                         producer.push(buf);
                     }
-                    Sink::Sidechain(levels) => {
-                        let p = if silent { 0.0 } else { peak(buf) };
-                        levels.now.store(p);
-                        levels.hold.raise(p);
-                    }
+                    Sink::Sidechain { levels, slot } => levels.report(*slot, if silent { 0.0 } else { peak(buf) }),
                 }
                 done += take;
             }
             unsafe { cap.ReleaseBuffer(frames) }.context("releasing a capture packet")?;
-            if let Sink::Music { gain, .. } = sink {
+            if let Sink::Source { gain, .. } = sink {
                 gain.packets.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -400,6 +481,21 @@ fn capture_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sidechain_level_is_the_loudest_app() {
+        let l = SidechainLevels::default();
+        l.report(0, 0.2);
+        l.report(3, 0.05);
+        assert_eq!(l.now(), 0.2);
+        l.report(0, 0.01);
+        assert_eq!(l.now(), 0.05, "each app's latest packet");
+        l.clear(3);
+        assert_eq!(l.now(), 0.01);
+        l.report(SIDECHAIN_SLOTS, 0.9);
+        assert_eq!(l.now(), 0.01, "an unknown slot does not count");
+        assert_eq!(l.hold.take(), 0.2, "the status shows the loudest packet since it last looked");
+    }
 
     #[test]
     fn fader_gates_fades_and_clamps() {

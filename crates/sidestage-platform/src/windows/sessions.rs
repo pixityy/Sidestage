@@ -116,6 +116,7 @@ impl Managers {
 }
 
 /// One audio session (one app's stream group on one endpoint).
+#[derive(Clone)]
 pub struct SessionRef {
     pub ctl: IAudioSessionControl,
     pub pid: u32,
@@ -135,8 +136,12 @@ impl SessionRef {
 
     /// Pre-volume peak of the session's audio.
     pub fn peak(&self) -> Option<f32> {
-        let m: IAudioMeterInformation = self.ctl.cast().ok()?;
+        let m: IAudioMeterInformation = self.meter().ok()?;
         unsafe { m.GetPeakValue() }.ok()
+    }
+
+    pub fn meter(&self) -> windows::core::Result<IAudioMeterInformation> {
+        self.ctl.cast()
     }
 
     pub fn display_name(&self) -> String {
@@ -192,22 +197,31 @@ pub fn scan(managers: &Managers) -> Vec<SessionRef> {
     out
 }
 
-/// Each session's meter peak, or `None` where the meter cannot be trusted to be per session.
+/// Each session's meter peak, or `None` where the meter cannot be trusted to show what the app
+/// plays.
 ///
-/// Session meters are normally per session and taken before the session volume. Some drivers
-/// report the endpoint's whole mix on every session's meter instead (seen here: two different
-/// apps on a USB headset reading the very same peak), which would make a silent app look like
-/// it is playing. Identical non-zero peaks from different processes on one endpoint are
-/// treated as such a shared meter.
+/// Session meters are taken before the session volume. A process that runs a process-loopback
+/// capture (Sidestage, a screen recorder, a voice chat sharing its screen) also gets a session
+/// on the captured audio's endpoint, and its meter shows the captured audio (measured on build
+/// 26200: a process playing silence while capturing a 0.01 tone read 0.0100), which would make
+/// a silent app look like it is playing. Identical non-zero peaks from different processes on
+/// one endpoint are treated as such a mirrored meter. Sidestage's own sessions are known
+/// mirrors (of its sources and of the apps ducking listens to), so matching one of them does not
+/// make the app's real meter untrusted.
 pub fn trusted_peaks(sessions: &[SessionRef]) -> Vec<Option<f32>> {
     let raw: Vec<Option<f32>> = sessions.iter().map(SessionRef::peak).collect();
-    sessions
-        .iter()
-        .zip(&raw)
-        .map(|(s, &p)| {
-            let shared = p.is_some_and(|p| p > 0.0)
-                && sessions.iter().zip(&raw).any(|(o, &q)| o.pid != s.pid && o.endpoint_id == s.endpoint_id && q == p);
-            if shared { None } else { p }
+    let keys: Vec<(u32, &str)> = sessions.iter().map(|s| (s.pid, s.endpoint_id.as_str())).collect();
+    unmirrored(&keys, &raw, std::process::id())
+}
+
+/// See [`trusted_peaks`]: `keys` are each session's (process, endpoint), `me` is Sidestage.
+fn unmirrored(keys: &[(u32, &str)], raw: &[Option<f32>], me: u32) -> Vec<Option<f32>> {
+    keys.iter()
+        .zip(raw)
+        .map(|(&(pid, ep), &p)| {
+            let mirrored = p.is_some_and(|p| p > 0.0)
+                && keys.iter().zip(raw).any(|(&(o, oep), &q)| o != pid && o != me && oep == ep && q == p);
+            if mirrored { None } else { p }
         })
         .collect()
 }
@@ -290,4 +304,25 @@ pub fn collect_apps(managers: &Managers, names: &mut Names) -> anyhow::Result<Ve
         .collect();
     apps.sort_by(|a, b| b.playing.cmp(&a.playing).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     Ok(apps)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mirrored_meters_are_not_trusted() {
+        const ME: u32 = 1;
+        // A capturing app (pid 3) mirrors the game (pid 2); Sidestage (pid 1) mirrors it too.
+        let keys = [(2, "ep"), (3, "ep"), (ME, "ep"), (4, "ep"), (5, "other")];
+        let raw = [Some(0.4), Some(0.4), Some(0.4), Some(0.0), Some(0.4)];
+        let t = unmirrored(&keys, &raw, ME);
+        assert_eq!(t[0], None, "the game matches another app's mirror");
+        assert_eq!(t[1], None, "so does the capturing app");
+        assert_eq!(t[3], Some(0.0), "silence is never a mirror");
+        assert_eq!(t[4], Some(0.4), "another endpoint is not compared");
+        // Only Sidestage mirrors the game: Sidestage's own sessions do not count against it.
+        let t = unmirrored(&[(2, "ep"), (ME, "ep")], &[Some(0.4), Some(0.4)], ME);
+        assert_eq!(t[0], Some(0.4));
+    }
 }

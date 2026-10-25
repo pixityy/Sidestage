@@ -1,6 +1,6 @@
 [package]
 name = "sidestage"
-description = "Put one app's audio (your music) behind you in 3D while your game audio stays untouched"
+description = "Put your music behind you, a podcast on your left and voice chat on your right, in 3D, while your game audio stays untouched"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

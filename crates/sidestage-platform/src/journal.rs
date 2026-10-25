@@ -14,11 +14,22 @@ use anyhow::Context;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+/// Environment variable that moves [`state_dir`] elsewhere, so test runs (and portable setups)
+/// never touch the journals of a Sidestage the user is running at the same time. Its companion
+/// `SIDESTAGE_CONFIG_DIR` (in the app) moves the settings folder.
+pub const STATE_DIR_ENV: &str = "SIDESTAGE_STATE_DIR";
+
 /// Per-user directory for Sidestage's state files (created on demand).
 ///
 /// Windows: `%LOCALAPPDATA%\Sidestage\data`, macOS: `~/Library/Application Support/Sidestage`,
-/// Linux: `$XDG_STATE_HOME/sidestage` (or `~/.local/state/sidestage`).
+/// Linux: `$XDG_STATE_HOME/sidestage` (or `~/.local/state/sidestage`); or [`STATE_DIR_ENV`]
+/// when it is set.
 pub fn state_dir() -> anyhow::Result<PathBuf> {
+    if let Some(dir) = std::env::var_os(STATE_DIR_ENV).filter(|d| !d.is_empty()) {
+        let dir = PathBuf::from(dir);
+        fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+        return Ok(dir);
+    }
     let dirs =
         directories::ProjectDirs::from("", "", "Sidestage").context("could not determine the user's home directory")?;
     let dir = dirs.state_dir().unwrap_or_else(|| dirs.data_local_dir()).to_path_buf();

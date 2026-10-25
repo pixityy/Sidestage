@@ -56,11 +56,19 @@ pub mod keys {
     pub const SUB_TAP_DRIFT: &str = "drift";
 }
 
-/// The music aggregate: the headphone output is the main and clock sub-device, the tap is its
-/// input. Private, so it is invisible to other apps and dies with Sidestage. `tapautostart`
-/// is on because with it off the tap can deliver silence until something else starts it
-/// (cpal 0.17 fixed silent loopback capture this way).
-pub fn render_aggregate(name: &str, uid: &str, output_uid: &str, tap_uid: &str, tap_drift: bool) -> Plist {
+/// One tap of an aggregate device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SubTap<'a> {
+    pub uid: &'a str,
+    /// Drift compensation (see [`tap_drift_compensation`]).
+    pub drift: bool,
+}
+
+/// A session's aggregate: the headphone output is the main and clock sub-device, every
+/// source's tap is an input, in `taps` order. Private, so it is invisible to other apps and
+/// dies with Sidestage. `tapautostart` is on because with it off a tap can deliver silence
+/// until something else starts it (cpal 0.17 fixed silent loopback capture this way).
+pub fn render_aggregate(name: &str, uid: &str, output_uid: &str, taps: &[SubTap<'_>]) -> Plist {
     Plist::Dict(vec![
         (keys::NAME, Plist::str(name)),
         (keys::UID, Plist::str(uid)),
@@ -77,7 +85,7 @@ pub fn render_aggregate(name: &str, uid: &str, output_uid: &str, tap_uid: &str, 
                 (keys::SUB_DEVICE_DRIFT, Plist::Bool(false)),
             ])]),
         ),
-        (keys::TAP_LIST, Plist::Array(vec![sub_tap(tap_uid, tap_drift)])),
+        (keys::TAP_LIST, Plist::Array(taps.iter().map(|t| sub_tap(t.uid, t.drift)).collect())),
     ])
 }
 
@@ -106,14 +114,88 @@ pub fn tap_drift_compensation(tap_on_output_clock: bool, output_shares_tap_clock
     !tap_on_output_clock && !output_shares_tap_clock
 }
 
-/// Input streams of the render aggregate that belong to the tap: the ones after the output
-/// device's own. `None` when there is no tap stream. A tap is one stream, which is also the
-/// assumption when the device's input streams could not be counted.
-pub fn tap_stream_count(aggregate_inputs: usize, device_inputs: Option<usize>) -> Option<usize> {
-    match device_inputs {
-        Some(device) => aggregate_inputs.checked_sub(device).filter(|&n| n > 0),
-        None => (aggregate_inputs > 0).then_some(1),
+/// Where one tap's streams sit among the aggregate's input streams.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TapStreams {
+    /// Its first stream, counted from the end of the input stream list (1 = the last stream).
+    pub from_end: usize,
+    /// Channels of each of its streams.
+    pub channels: Vec<usize>,
+}
+
+/// Splits the aggregate's input streams (`stream_channels`, from
+/// `kAudioDevicePropertyStreamConfiguration`) among its taps, given each tap's channel count in
+/// the aggregate's tap order.
+///
+/// The output device's own input streams come first and the taps' streams after them, in tap
+/// order: FineTune, corti and Sidestage's single-tap build all find a tap as the trailing input
+/// buffer(s), and Apple documents for sub-devices that their list order is the stream order.
+/// Apple says nothing about taps, so the layout is checked instead of assumed: walking back from
+/// the end, each tap must take whole streams that add up to exactly its channel count (one
+/// stream per tap is what the HAL does in practice; a tap split into mono streams also fits),
+/// and when the device's input stream count is known, exactly those streams must be left over.
+/// Anything else is an error: reading the wrong streams would play one app as another.
+pub fn input_layout(
+    stream_channels: &[usize],
+    device_inputs: Option<usize>,
+    tap_channels: &[usize],
+) -> Result<Vec<TapStreams>, String> {
+    if tap_channels.is_empty() {
+        return Err("no taps".to_string());
     }
+    let mut end = stream_channels.len();
+    let mut layout = Vec::with_capacity(tap_channels.len());
+    for (tap, &wanted) in tap_channels.iter().enumerate().rev() {
+        if wanted == 0 {
+            return Err(format!("tap {tap} has no channels"));
+        }
+        let mut start = end;
+        let mut channels = 0;
+        while channels < wanted {
+            start = start.checked_sub(1).ok_or_else(|| {
+                format!("the input streams {stream_channels:?} do not hold taps of {tap_channels:?} channels")
+            })?;
+            channels += stream_channels[start];
+        }
+        if channels != wanted {
+            return Err(format!(
+                "the input streams {stream_channels:?} do not line up with taps of {tap_channels:?} channels"
+            ));
+        }
+        layout.push(TapStreams {
+            from_end: stream_channels.len() - start,
+            channels: stream_channels[start..end].to_vec(),
+        });
+        end = start;
+    }
+    if let Some(device) = device_inputs
+        && device != end
+    {
+        return Err(format!(
+            "the input streams {stream_channels:?} hold {end} stream(s) besides the taps, but the output device has {device}"
+        ));
+    }
+    layout.reverse();
+    Ok(layout)
+}
+
+/// The order of `ours` (the tap UIDs Sidestage put in the aggregate's description) as the HAL
+/// reports it in `kAudioAggregateDevicePropertyTapList`, as indices into `ours`. `None` when the
+/// report is not a permutation of `ours` (unreadable, or the HAL dropped a tap); the caller then
+/// keeps its own order and relies on the layout check.
+pub fn tap_order(ours: &[String], reported: &[String]) -> Option<Vec<usize>> {
+    if reported.len() != ours.len() {
+        return None;
+    }
+    let mut order = Vec::with_capacity(ours.len());
+    for uid in reported {
+        let i = ours.iter().position(|o| o.eq_ignore_ascii_case(uid))?;
+        if order.contains(&i) {
+            return None;
+        }
+        order.push(i);
+    }
+    Some(order)
 }
 
 /// Per-stream "in use" flags for `kAudioDevicePropertyIOProcStreamUsage` on the render
@@ -282,17 +364,31 @@ pub fn device_tap_matches(tap_channels: usize, tap_rate: f64, stream: DeviceStre
     tap_channels == stream.channels && !rate_changed(device_rate, tap_rate)
 }
 
+/// Whether [`device_tap_matches`] can tell a tap on the intended output stream from one on a
+/// stream the other reading of the index points to. With no input streams both readings name
+/// the same stream. Otherwise FineTune's reading (all streams, input streams first) can land on
+/// an input stream, or shift to another output stream; if that stream has the same channel
+/// count the check passes, yet the tap captures nothing and mutes nothing, so the app would be
+/// heard unprocessed. Such devices get a stereo mixdown.
+pub fn device_tap_verifiable(stream: DeviceStream, output_channels: &[usize], input_channels: &[usize]) -> bool {
+    input_channels.is_empty()
+        || (!input_channels.contains(&stream.channels)
+            && output_channels.iter().enumerate().all(|(i, &c)| i == stream.index || c != stream.channels))
+}
+
 /// Sample rates differ by more than rounding noise.
 pub fn rate_changed(was: f64, now: f64) -> bool {
     (was - now).abs() >= 0.5
 }
 
-/// The sidechain's exclusion list: the music app and Sidestage itself.
-pub fn sidechain_excluded(music: &[u32], own: u32) -> Vec<u32> {
-    let mut excluded = music.to_vec();
-    if !excluded.contains(&own) {
-        excluded.push(own);
-    }
+/// The sidechain's exclusion list: every source's and every ignored app's process objects, and
+/// Sidestage itself (last, so it is never dropped as a duplicate). Sorted, so an unchanged set
+/// compares equal and the tap is not rewritten.
+pub fn sidechain_excluded(apps: impl IntoIterator<Item = u32>, own: u32) -> Vec<u32> {
+    let mut excluded: Vec<u32> = apps.into_iter().filter(|&o| o != own).collect();
+    excluded.sort_unstable();
+    excluded.dedup();
+    excluded.push(own);
     excluded
 }
 
@@ -333,6 +429,13 @@ pub fn looks_like_denied_capture(playing_secs: f64, silent_secs: f64) -> bool {
     playing_secs >= SUSPICIOUS_SILENCE_SECS && silent_secs >= SUSPICIOUS_SILENCE_SECS
 }
 
+/// How long a switch waits for the old engine to fade out and let go of its processors: a few
+/// of its IO cycles, within bounds, so an engine whose IO has stalled cannot hold it up.
+pub fn retire_timeout(buffer_frames: u32, sample_rate: u32) -> Duration {
+    let cycle = f64::from(buffer_frames) / f64::from(sample_rate.max(1));
+    Duration::from_secs_f64((4.0 * cycle).clamp(0.02, 0.25))
+}
+
 /// Wait before rebuilding after `failures` consecutive failed attempts.
 pub fn retry_delay(failures: u32) -> Duration {
     let ms = 500u64.saturating_mul(1 << failures.saturating_sub(1).min(4));
@@ -345,7 +448,8 @@ mod tests {
 
     #[test]
     fn render_aggregate_is_clocked_by_the_output() {
-        let d = render_aggregate("Sidestage", "agg-1", "BuiltInSpeakerDevice", "TAP-UUID", false);
+        let taps = [SubTap { uid: "TAP-UUID", drift: false }, SubTap { uid: "TAP-2", drift: true }];
+        let d = render_aggregate("Sidestage", "agg-1", "BuiltInSpeakerDevice", &taps);
         assert_eq!(d.get("master"), Some(&Plist::Str("BuiltInSpeakerDevice".into())));
         assert_eq!(d.get("clock"), Some(&Plist::Str("BuiltInSpeakerDevice".into())));
         assert_eq!(d.get("private"), Some(&Plist::Bool(true)));
@@ -355,8 +459,11 @@ mod tests {
         assert_eq!(subs.len(), 1);
         assert_eq!(subs[0].get("uid"), Some(&Plist::Str("BuiltInSpeakerDevice".into())));
         let Some(Plist::Array(taps)) = d.get("taps") else { panic!("taps") };
+        assert_eq!(taps.len(), 2, "one tap per source, in order");
         assert_eq!(taps[0].get("uid"), Some(&Plist::Str("TAP-UUID".into())));
         assert_eq!(taps[0].get("drift"), Some(&Plist::Bool(false)));
+        assert_eq!(taps[1].get("uid"), Some(&Plist::Str("TAP-2".into())));
+        assert_eq!(taps[1].get("drift"), Some(&Plist::Bool(true)));
     }
 
     #[test]
@@ -470,23 +577,71 @@ mod tests {
     }
 
     #[test]
-    fn tap_streams_follow_the_device_inputs() {
-        assert_eq!(tap_stream_count(1, Some(0)), Some(1), "plain output device");
-        assert_eq!(tap_stream_count(3, Some(2)), Some(1), "headset with two mic streams");
-        assert_eq!(tap_stream_count(2, Some(2)), None, "the tap stream is missing");
-        assert_eq!(tap_stream_count(1, Some(4)), None, "inconsistent counts");
-        assert_eq!(tap_stream_count(0, None), None);
-        assert_eq!(tap_stream_count(3, None), Some(1), "unknown device inputs: only the last stream");
+    fn device_taps_only_where_a_misplaced_tap_would_show() {
+        let stereo = DeviceStream { index: 0, first_channel: 0, channels: 2 };
+        // Built-in speakers, plain headphones: no input streams, one reading.
+        assert!(device_tap_verifiable(stereo, &[2], &[]));
+        // A headset with a mono microphone: a tap on it would be caught by its format.
+        assert!(device_tap_verifiable(stereo, &[2], &[1]));
+        // A stereo microphone or interface input: indistinguishable, so a mixdown.
+        assert!(!device_tap_verifiable(stereo, &[2], &[2]));
+        // Two stereo output streams next to a microphone: the index could shift between them.
+        let second = DeviceStream { index: 1, first_channel: 2, channels: 2 };
+        assert!(!device_tap_verifiable(second, &[2, 2], &[1]));
+        assert!(device_tap_verifiable(second, &[2, 2], &[]));
+        // An 8-channel interface output next to a stereo input.
+        let wide = DeviceStream { index: 0, first_channel: 0, channels: 8 };
+        assert!(device_tap_verifiable(wide, &[8], &[2]));
+    }
+
+    #[test]
+    fn input_streams_are_split_among_the_taps() {
+        let ts = |from_end: usize, channels: &[usize]| TapStreams { from_end, channels: channels.to_vec() };
+        // Plain output device, one stereo tap.
+        assert_eq!(input_layout(&[2], Some(0), &[2]), Ok(vec![ts(1, &[2])]));
+        // Headset with a mono microphone, then three stereo taps.
+        assert_eq!(input_layout(&[1, 2, 2, 2], Some(1), &[2, 2, 2]), Ok(vec![ts(3, &[2]), ts(2, &[2]), ts(1, &[2])]));
+        // An 8-channel device-scoped tap next to a stereo mixdown.
+        assert_eq!(input_layout(&[8, 2], Some(0), &[8, 2]), Ok(vec![ts(2, &[8]), ts(1, &[2])]));
+        // A tap the HAL split into mono streams.
+        assert_eq!(input_layout(&[1, 1, 2], None, &[2, 2]), Ok(vec![ts(3, &[1, 1]), ts(1, &[2])]));
+        // Device inputs unknown: whatever precedes the taps is the device's.
+        assert_eq!(input_layout(&[1, 1, 2], None, &[2]), Ok(vec![ts(1, &[2])]));
+    }
+
+    #[test]
+    fn input_layouts_that_do_not_fit_are_refused() {
+        assert!(input_layout(&[2], Some(0), &[]).is_err(), "no taps");
+        assert!(input_layout(&[2, 2], Some(0), &[2]).is_err(), "a stream the device does not have");
+        assert_eq!(input_layout(&[2, 2], Some(1), &[2]).map(|l| l.len()), Ok(1), "a stereo microphone");
+        assert!(input_layout(&[2], Some(0), &[2, 2]).is_err(), "a tap is missing");
+        assert!(input_layout(&[4], Some(0), &[2]).is_err(), "the tap has another channel count");
+        assert!(input_layout(&[1, 2], Some(0), &[1, 1, 1]).is_err(), "a stream straddles two taps");
+        assert!(input_layout(&[2, 8], Some(0), &[8, 2]).is_err(), "taps in another order than the streams");
+        assert!(input_layout(&[0], Some(0), &[0]).is_err(), "an empty tap");
         // The usage flags turn off exactly what precedes the tap streams.
-        let flags = input_stream_usage(3, 2).unwrap_or_default();
-        assert_eq!(flags.iter().filter(|&&f| f == 1).count(), tap_stream_count(3, Some(2)).unwrap_or(0));
+        assert_eq!(input_stream_usage(4, 1), Some(vec![0, 1, 1, 1]));
+    }
+
+    #[test]
+    fn tap_order_follows_the_hal() {
+        let ours: Vec<String> = ["A-1", "B-2", "C-3"].iter().map(|s| s.to_string()).collect();
+        let reported = |r: &[&str]| r.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(tap_order(&ours, &reported(&["A-1", "B-2", "C-3"])), Some(vec![0, 1, 2]));
+        assert_eq!(tap_order(&ours, &reported(&["c-3", "A-1", "B-2"])), Some(vec![2, 0, 1]), "UUID case is ignored");
+        assert_eq!(tap_order(&ours, &reported(&["A-1", "B-2"])), None, "a tap is missing");
+        assert_eq!(tap_order(&ours, &reported(&["A-1", "A-1", "B-2"])), None);
+        assert_eq!(tap_order(&ours, &reported(&["A-1", "B-2", "X-9"])), None);
+        assert_eq!(tap_order(&[], &[]), Some(vec![]));
     }
 
     #[test]
     fn sidechain_always_excludes_sidestage() {
-        assert_eq!(sidechain_excluded(&[10, 11], 99), vec![10, 11, 99]);
-        assert_eq!(sidechain_excluded(&[], 99), vec![99]);
-        assert_eq!(sidechain_excluded(&[99, 10], 99), vec![99, 10]);
+        assert_eq!(sidechain_excluded([11, 10], 99), vec![10, 11, 99]);
+        assert_eq!(sidechain_excluded([], 99), vec![99]);
+        assert_eq!(sidechain_excluded([99, 10], 99), vec![10, 99]);
+        // Two sources and an ignored app sharing a helper process.
+        assert_eq!(sidechain_excluded([30, 31, 20, 31, 40], 5), vec![20, 30, 31, 40, 5]);
     }
 
     #[test]
@@ -518,5 +673,13 @@ mod tests {
         assert_eq!(retry_delay(2), Duration::from_millis(1000));
         assert_eq!(retry_delay(4), Duration::from_millis(4000));
         assert_eq!(retry_delay(30), Duration::from_millis(5000));
+    }
+
+    #[test]
+    fn retire_waits_a_few_cycles_within_bounds() {
+        assert_eq!(retire_timeout(512, 48_000), Duration::from_secs_f64(4.0 * 512.0 / 48_000.0));
+        assert_eq!(retire_timeout(16, 48_000), Duration::from_millis(20), "tiny buffers");
+        assert_eq!(retire_timeout(48_000, 48_000), Duration::from_millis(250), "huge buffers");
+        assert_eq!(retire_timeout(512, 0), Duration::from_millis(250), "unknown rate");
     }
 }

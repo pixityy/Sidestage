@@ -1,5 +1,5 @@
 //! Ctrl+C / termination handling, so `sidestage run` and the window always stop their session
-//! (and with it restore the music app's original output) instead of dying mid-session.
+//! (and with it restore every source's original output) instead of dying mid-session.
 //!
 //! A second Ctrl+C ends the process at once, in case stopping hangs; the crash guardian and the
 //! next launch then restore the original output.

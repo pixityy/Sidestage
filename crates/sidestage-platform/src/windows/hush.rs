@@ -1,4 +1,4 @@
-//! Hiding the original ("hush"): the music app's sessions are turned down to -120 dB and the
+//! Hiding the original ("hush"): each source's app sessions are turned down to -120 dB and its
 //! capture is multiplied back up.
 //!
 //! Process loopback taps the app *after* its session volume, and that volume is an exact linear
@@ -6,10 +6,13 @@
 //! is the original signal. Windows persists per-app volume, so the original volume and mute of
 //! every session are written to the journal before anything changes; a clean stop, the
 //! guardian process or the next start restores them.
+//!
+//! One journal record holds every app the session hides: the session's [`Ledger`] owns it and
+//! each source's [`Hush`] adds and removes its own app's entries.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
@@ -21,7 +24,7 @@ use windows::Win32::Media::Audio::{AudioSessionStateExpired, IAudioSessionEvents
 use super::capture::Gain;
 use super::com::{NamedMutex, NamedMutexGuard, process_alive, process_created};
 use super::notify::{self, Event, SIDESTAGE_CONTEXT};
-use super::procs::{app_key, pid_path};
+use super::procs::{app_key, match_key, pid_path};
 use super::sessions::SessionRef;
 use super::{guardian, sessions};
 use crate::journal::Journal;
@@ -112,7 +115,7 @@ pub struct Store {
     lock: Mutex<()>,
     /// Shared with other Sidestage processes and guardians.
     shared: Option<NamedMutex>,
-    /// A session is hiding an app and owns the entries.
+    /// A session's [`Ledger`] owns the entries (it may be hiding several apps).
     hiding: AtomicBool,
     /// Entries remain that could not be restored yet (their app is not running).
     pending: AtomicBool,
@@ -201,14 +204,14 @@ impl Store {
         self.journal.save(&Record { version: 1, owner_pid, owner_created, entries: entries.to_vec() })
     }
 
-    /// Claims the journal for a hiding session. Returns the entries left by earlier runs.
+    /// Claims the journal for a session's ledger. Returns the entries left by earlier runs.
     pub fn begin_hiding(&self) -> anyhow::Result<Vec<Entry>> {
         let _g = self.guard();
         if self.hiding.load(Ordering::Acquire) {
-            bail!("Sidestage is already hiding an app; stop that session first");
+            bail!("an earlier Sidestage session is still hiding apps; stop it first");
         }
         let Some((entries, _)) = self.load_owned()? else {
-            bail!("another Sidestage window is already hiding an app; close it first");
+            bail!("another Sidestage window is already hiding apps; close it first");
         };
         if !entries.is_empty() {
             self.write(&entries)?; // take ownership
@@ -217,7 +220,7 @@ impl Store {
         Ok(entries)
     }
 
-    /// Saves the hiding session's entries (call before every change to the OS).
+    /// Saves the ledger's entries (call before every change to the OS).
     pub fn save(&self, entries: &[Entry]) -> anyhow::Result<()> {
         let _g = self.guard();
         self.write(entries)
@@ -376,7 +379,7 @@ fn restore_one(s: &SessionRef, e: &Entry) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Gives a session of another instance of the music app (not captured) the app's volume back
+/// Gives a session of another instance of a source's app (not captured) the app's volume back
 /// if Windows started it at a hushed level. Only an exact hush level counts: any other volume,
 /// and the mute state, are the user's or the app's choice for that instance.
 fn restore_instance(s: &SessionRef, e: &Entry) -> anyhow::Result<()> {
@@ -390,7 +393,129 @@ fn restore_instance(s: &SessionRef, e: &Entry) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A session of the music app that Sidestage has turned down.
+/// The session's share of the journal: the entries of every source's sessions plus whatever
+/// earlier runs (or sources removed while their app was closed) left to restore, all written as
+/// one record. Lives on the supervisor thread, which makes every change to the OS.
+///
+/// The journal is claimed the first time a source hides its app and released when the session
+/// ends. Dropping an unreleased ledger (the supervisor panicked) still restores what it can.
+pub struct Ledger {
+    store: Option<&'static Store>,
+    pub entries: Vec<Entry>,
+    /// In-memory entries changed since the journal was last written.
+    dirty: bool,
+    released: bool,
+}
+
+impl Default for Ledger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Ledger {
+    pub fn new() -> Self {
+        Ledger { store: None, entries: Vec::new(), dirty: false, released: false }
+    }
+
+    /// Takes the journal over for this session (once): fails if another running Sidestage is
+    /// hiding apps. Leftovers of earlier runs become this session's to restore.
+    pub fn claim(&mut self) -> anyhow::Result<()> {
+        if self.store.is_some() {
+            return Ok(());
+        }
+        let store = store()?;
+        self.entries = store.begin_hiding()?;
+        self.store = Some(store);
+        self.released = false;
+        Ok(())
+    }
+
+    /// Writes every entry (call before each change to the OS).
+    pub fn save(&mut self) -> anyhow::Result<()> {
+        let Some(store) = self.store else {
+            return Ok(());
+        };
+        store.save(&self.entries).context("writing the crash-recovery journal")?;
+        self.dirty = false;
+        Ok(())
+    }
+
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    /// Writes the journal if entries changed since the last write.
+    pub fn flush(&mut self) -> anyhow::Result<()> {
+        if self.dirty { self.save() } else { Ok(()) }
+    }
+
+    /// Restores entries of apps no source is hiding now (an earlier run's leftovers, a source
+    /// removed while its app was closed, ...) whose sessions are live.
+    pub fn restore_foreign(&mut self, live: &[SessionRef], hidden_by_source: impl Fn(&str) -> bool) {
+        if self.entries.is_empty() {
+            return;
+        }
+        let (others, mine): (Vec<Entry>, Vec<Entry>) =
+            std::mem::take(&mut self.entries).into_iter().partition(|e| !hidden_by_source(&e.app));
+        self.entries = mine;
+        if others.is_empty() {
+            return;
+        }
+        let (others, dropped) = drop_stale(others);
+        let (restored, remaining) = restore(others, live);
+        self.entries.extend(remaining);
+        for e in &dropped {
+            log::info!("dropped the hush journal entry for {} on {}", e.app_name, e.endpoint_name);
+        }
+        if (!restored.is_empty() || !dropped.is_empty())
+            && let Err(e) = self.save()
+        {
+            log::warn!("{e:#}");
+        }
+    }
+
+    /// Restores every entry whose session is live and releases the journal; the rest stay
+    /// journaled for the platform worker, the guardian or the next start.
+    pub fn release(&mut self, live: &[SessionRef]) -> anyhow::Result<()> {
+        let Some(store) = self.store else {
+            return Ok(());
+        };
+        if self.released {
+            return Ok(());
+        }
+        self.released = true;
+        let (restored, remaining) = restore(std::mem::take(&mut self.entries), live);
+        if !restored.is_empty() {
+            log::info!("restored {} leftover session(s)", restored.len());
+        }
+        let r = store.end_hiding(&remaining).context("updating the crash-recovery journal");
+        self.store = None;
+        r
+    }
+}
+
+impl Drop for Ledger {
+    fn drop(&mut self) {
+        if self.store.is_none() || self.released {
+            return;
+        }
+        // Only reached if the session ended without finishing (a panic): put back what is live
+        // now; the guardian and the next start handle the rest.
+        let mut managers = sessions::Managers::default();
+        if let Ok(en) = sessions::enumerator()
+            && let Err(e) = managers.refresh(&en)
+        {
+            log::debug!("listing outputs to restore volumes: {e:#}");
+        }
+        let live = sessions::scan(&managers);
+        if let Err(e) = self.release(&live) {
+            log::error!("restoring volumes: {e:#}");
+        }
+    }
+}
+
+/// A session of a source's app that Sidestage has turned down.
 struct Tracked {
     session: SessionRef,
     vol: ISimpleAudioVolume,
@@ -401,7 +526,7 @@ struct Tracked {
     rehush: bool,
 }
 
-/// What a foreign volume change means for the supervisor.
+/// What a foreign volume change means for the source.
 #[derive(Debug, PartialEq)]
 pub enum Change {
     None,
@@ -411,13 +536,20 @@ pub enum Change {
     Mute,
 }
 
-/// The hush state of one hiding session.
+/// Identifies one source's hush state in notifications (a removed source's late events must
+/// not reach a newer source of the same app).
+pub fn next_token() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
+}
+
+/// The hush state of one source: its app's sessions, the level they are held at and the
+/// volume the user wants to hear the app at. Its journal entries live in the [`Ledger`].
 pub struct Hush {
-    store: &'static Store,
     app: String,
+    match_key: String,
     app_name: String,
-    /// Everything in the journal: this app's sessions plus leftovers of earlier runs.
-    entries: Vec<Entry>,
+    token: u64,
     tracked: HashMap<Arc<str>, Tracked>,
     level: usize,
     /// The volume read back after hushing (f32 bits), shared with the event sinks.
@@ -431,22 +563,18 @@ pub struct Hush {
     /// app that resets its own volume every time is "fighting".
     last_apply: Option<Instant>,
     fights: VecDeque<Instant>,
-    /// In-memory entries changed since the journal was last written.
-    dirty: bool,
     /// Hushing failed at every level: the original stays audible.
     pub failed: bool,
     finished: bool,
 }
 
 impl Hush {
-    pub fn begin(app: &str, app_name: &str, gain: Arc<Gain>, tx: Sender<Event>) -> anyhow::Result<Self> {
-        let store = store()?;
-        let entries = store.begin_hiding()?;
-        Ok(Hush {
-            store,
+    pub fn new(app: &str, app_name: &str, token: u64, gain: Arc<Gain>, tx: Sender<Event>) -> Self {
+        Hush {
             app: app.to_owned(),
+            match_key: match_key(app),
             app_name: app_name.to_owned(),
-            entries,
+            token,
             tracked: HashMap::new(),
             level: 0,
             applied: Arc::new(AtomicU32::new(LEVELS[0].to_bits())),
@@ -455,10 +583,23 @@ impl Hush {
             tx,
             last_apply: None,
             fights: VecDeque::new(),
-            dirty: false,
             failed: false,
             finished: false,
-        })
+        }
+    }
+
+    /// Names this hush state in its sessions' notifications.
+    pub fn token(&self) -> u64 {
+        self.token
+    }
+
+    pub fn set_app_name(&mut self, name: &str) {
+        name.clone_into(&mut self.app_name);
+    }
+
+    /// True if a journal entry is this app's (also one written for an older version of it).
+    pub fn owns(&self, e: &Entry) -> bool {
+        e.app == self.app || match_key(&e.app) == self.match_key
     }
 
     pub fn is_tracked(&self, instance: &str) -> bool {
@@ -503,7 +644,7 @@ impl Hush {
 
     /// Journals and hushes the given sessions of the app that are not tracked yet. Returns true
     /// if any was hushed (the capture level changes, so the gate must settle).
-    pub fn adopt(&mut self, new: Vec<SessionRef>) -> anyhow::Result<bool> {
+    pub fn adopt(&mut self, ledger: &mut Ledger, new: Vec<SessionRef>) -> anyhow::Result<bool> {
         if self.failed {
             return Ok(false);
         }
@@ -529,17 +670,20 @@ impl Hush {
         if fresh.is_empty() {
             return Ok(false);
         }
+        ledger.claim()?;
 
         // Journal first. A session already near our level was hushed by an earlier run whose
-        // entry is gone; give it the app's level (or full volume) back on restore.
+        // entry is gone; give it the app's level (or full volume) back on restore. A session
+        // that still has an entry (an earlier run crashed, or this app was a source before)
+        // keeps it: it holds the real original volume.
         let fallback = self.desired.unwrap_or(1.0);
         for (s, _, cur, muted) in &fresh {
-            if self.entries.iter().any(|e| e.session_id == s.session_id) {
+            if ledger.entries.iter().any(|e| e.session_id == s.session_id) {
                 continue;
             }
             let volume = if *cur > 0.0 && *cur <= HUSHED_BELOW { fallback } else { *cur };
             let exe = pid_path(s.pid).map(|p| app_key(&p)).unwrap_or_default();
-            self.entries.push(Entry {
+            ledger.entries.push(Entry {
                 app: self.app.clone(),
                 app_name: self.app_name.clone(),
                 session_id: s.session_id.clone(),
@@ -554,31 +698,35 @@ impl Hush {
         }
         if self.desired.is_none() {
             let primary = fresh.iter().find(|f| f.0.active()).unwrap_or(&fresh[0]);
-            let entry = self.entries.iter().find(|e| e.session_id == primary.0.session_id);
+            let entry = ledger.entries.iter().find(|e| e.session_id == primary.0.session_id);
             self.desired = Some(entry.map_or(1.0, |e| e.volume));
         }
-        self.store.save(&self.entries).context("writing the crash-recovery journal")?;
-        self.dirty = false;
+        ledger.save()?;
         log::info!("hiding {} session(s) of {} (volume to restore: {:.3})", fresh.len(), self.app_name, self.desired());
 
         for (s, vol, _, _) in fresh {
             let instance: Arc<str> = Arc::from(s.instance_id.as_str());
-            let events =
-                notify::hushed_events(instance.clone(), self.tx.clone(), self.gain.clone(), self.applied.clone());
+            let events = notify::hushed_events(
+                self.token,
+                instance.clone(),
+                self.tx.clone(),
+                self.gain.clone(),
+                self.applied.clone(),
+            );
             if let Err(e) = unsafe { s.ctl.RegisterAudioSessionNotification(&events) } {
                 log::warn!("cannot watch a session of {} for volume changes: {e}", self.app_name);
             }
             self.tracked.insert(instance, Tracked { session: s, vol, events, muted: false, rehush: true });
         }
-        self.apply()?;
+        self.apply(ledger)?;
         Ok(true)
     }
 
     /// Sets every tracked session that needs it to the current level and reads the level back.
     /// Moves to a louder level if the engine reports 0 (treats it as mute).
-    pub fn apply(&mut self) -> anyhow::Result<()> {
+    pub fn apply(&mut self, ledger: &mut Ledger) -> anyhow::Result<()> {
         // What to restore must be on disk before the volume changes.
-        self.flush()?;
+        ledger.flush()?;
         self.last_apply = Some(Instant::now());
         while !self.failed {
             let level = LEVELS[self.level];
@@ -612,7 +760,7 @@ impl Hush {
                 if self.level >= LEVELS.len() {
                     self.failed = true;
                     log::warn!("{} cannot be turned down without muting it; keeping it audible", self.app_name);
-                    self.unhush_all();
+                    self.unhush_all(ledger);
                     break;
                 }
                 log::info!("volume {level} reads back as 0; trying {}", LEVELS[self.level]);
@@ -645,7 +793,7 @@ impl Hush {
     }
 
     /// Someone other than Sidestage changed a tracked session's volume or mute.
-    pub fn on_foreign_change(&mut self, instance: &str, volume: f32, muted: bool) -> Change {
+    pub fn on_foreign_change(&mut self, ledger: &mut Ledger, instance: &str, volume: f32, muted: bool) -> Change {
         let applied = self.applied();
         let Some(t) = self.tracked.get_mut(instance) else {
             return Change::None;
@@ -671,7 +819,7 @@ impl Hush {
             change = Change::Volume;
         }
         if change != Change::None {
-            for e in self.entries.iter_mut().filter(|e| e.session_id == session_id) {
+            for e in ledger.entries.iter_mut().filter(|e| e.session_id == session_id) {
                 if change == Change::Volume {
                     e.volume = volume.clamp(0.0, 1.0);
                 }
@@ -679,18 +827,9 @@ impl Hush {
             }
             // Written before the next re-hush, or by the supervisor shortly: a slider drag
             // sends dozens of changes and each write is an fsync.
-            self.dirty = true;
+            ledger.mark_dirty();
         }
         change
-    }
-
-    /// Writes the journal if entries changed since the last write.
-    pub fn flush(&mut self) -> anyhow::Result<()> {
-        if self.dirty {
-            self.store.save(&self.entries).context("writing the crash-recovery journal")?;
-            self.dirty = false;
-        }
-        Ok(())
     }
 
     /// Stops tracking a session that ended (its journal entry stays until it is restored).
@@ -708,45 +847,27 @@ impl Hush {
         }
     }
 
-    /// Restores leftovers of earlier runs (other apps) whose sessions are live.
-    ///
-    /// `live` are the sessions outside the attached process tree, and `instances` the indices
-    /// of those that belong to another instance of the app. That instance is not captured, so
-    /// a session of it that started at the hushed volume Windows saved for the app (the volume
-    /// of the last session that closed) gets the app's normal volume back; the entry stays,
-    /// the attached instance still needs it.
-    pub fn restore_others(&mut self, live: &[SessionRef], instances: &[usize]) {
+    /// Another instance of the app is not captured, so a session of it that started at the
+    /// hushed volume Windows saved for the app (the volume of the last session that closed)
+    /// gets the app's normal volume back; the entry stays, the attached instance still needs
+    /// it. `instances` index `live`.
+    pub fn restore_instances(&self, ledger: &Ledger, live: &[SessionRef], instances: &[usize]) {
         for s in instances.iter().filter_map(|&i| live.get(i)) {
-            if let Some(e) = self.entries.iter().find(|e| e.app == self.app && e.session_id == s.session_id)
+            if let Some(e) = ledger.entries.iter().find(|e| self.owns(e) && e.session_id == s.session_id)
                 && let Err(err) = restore_instance(s, e)
             {
                 log::debug!("restoring another {}: {err:#}", self.app_name);
             }
         }
-        let (others, mine): (Vec<Entry>, Vec<Entry>) =
-            std::mem::take(&mut self.entries).into_iter().partition(|e| e.app != self.app);
-        if others.is_empty() {
-            self.entries = mine;
-            return;
-        }
-        let (others, _dropped) = drop_stale(others);
-        let (restored, remaining) = restore(others, live);
-        self.entries = mine;
-        self.entries.extend(remaining);
-        if !restored.is_empty()
-            && let Err(e) = self.store.save(&self.entries)
-        {
-            log::warn!("updating the crash-recovery journal: {e:#}");
-        }
     }
 
     /// Makes the tracked sessions audible again at their journaled level (the pipeline failed,
     /// or hushing does not work for this app); they are re-hushed when playback resumes.
-    pub fn unhush_all(&mut self) {
+    pub fn unhush_all(&mut self, ledger: &Ledger) {
         let desired = self.desired();
         for t in self.tracked.values_mut() {
             let volume =
-                self.entries.iter().find(|e| e.session_id == t.session.session_id).map_or(desired, |e| e.volume);
+                ledger.entries.iter().find(|e| e.session_id == t.session.session_id).map_or(desired, |e| e.volume);
             unsafe {
                 let _ = t.vol.SetMasterVolume(volume, &SIDESTAGE_CONTEXT);
             }
@@ -754,11 +875,11 @@ impl Hush {
         }
     }
 
-    /// Restores every live session and releases the journal. `others` are the other live
-    /// sessions (every output, from [`sessions::scan`]): another instance of the app, or an
-    /// earlier run's leftover, may be restorable there too. Entries whose session is not live
-    /// stay journaled for the platform, the guardian or the next start.
-    pub fn finish(&mut self, others: Vec<SessionRef>) -> anyhow::Result<()> {
+    /// Restores every live session of the app and drops their entries; entries whose session
+    /// is not live stay in the ledger until the app plays again (see
+    /// [`Ledger::restore_foreign`]). `others` are the other live sessions (every output, from
+    /// [`sessions::scan`]): the app may have sessions there that are not tracked.
+    pub fn finish(&mut self, ledger: &mut Ledger, others: &[SessionRef]) -> anyhow::Result<()> {
         if self.finished {
             return Ok(());
         }
@@ -775,29 +896,34 @@ impl Hush {
             .filter(|s| unsafe { s.ctl.GetState() }.is_ok_and(|st| st != AudioSessionStateExpired))
             .collect();
         let known: HashSet<String> = live.iter().map(|s| s.instance_id.clone()).collect();
-        live.extend(others.into_iter().filter(|s| !known.contains(&s.instance_id)));
-        let entries = std::mem::take(&mut self.entries);
-        let (restored, remaining) = restore(entries, &live);
+        live.extend(others.iter().filter(|s| !known.contains(&s.instance_id)).cloned());
+        let (mine, rest): (Vec<Entry>, Vec<Entry>) =
+            std::mem::take(&mut ledger.entries).into_iter().partition(|e| self.owns(e));
+        ledger.entries = rest;
+        if mine.is_empty() {
+            return Ok(());
+        }
+        let (restored, remaining) = restore(mine, &live);
         if !restored.is_empty() {
             log::info!("restored {} session(s) of {}", restored.len(), self.app_name);
         }
-        let mine_left = remaining.iter().filter(|e| e.app == self.app).count();
-        if mine_left > 0 {
+        if !remaining.is_empty() {
             log::info!(
                 "{} of {}'s sessions are not live; they will be restored when it plays again",
-                mine_left,
+                remaining.len(),
                 self.app_name
             );
         }
-        self.store.end_hiding(&remaining).context("updating the crash-recovery journal")
+        ledger.entries.extend(remaining);
+        ledger.save()
     }
 }
 
 impl Drop for Hush {
     fn drop(&mut self) {
-        if let Err(e) = self.finish(Vec::new()) {
-            log::error!("restoring {}'s volume: {e:#}", self.app_name);
-        }
+        // Volumes are put back by `finish` or, failing that, by the ledger; only the
+        // notification registrations end here.
+        self.forget_all();
     }
 }
 

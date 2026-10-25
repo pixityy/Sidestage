@@ -305,6 +305,11 @@ impl Conn {
         self.payload.get(REPLY_BODY..).unwrap_or_default()
     }
 
+    /// The last control packet's payload, undecoded.
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+
     /// Streams a data packet's payload to `f` in pieces, straight out of the read buffer
     /// (no copy, no allocation).
     pub fn read_data(&mut self, length: u32, mut f: impl FnMut(&[u8])) -> io::Result<()> {

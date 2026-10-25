@@ -1,6 +1,7 @@
 //! Screenshot mode for checking the UI without a person at the screen:
 //! `SIDESTAGE_SCREENSHOT=out.png sidestage` renders the demo for a moment, saves the window as a
-//! PNG and quits (also writes the window icon as `out.icon.png`).
+//! PNG and quits (also writes the window icon as `out.icon.png`). The "real" scene shows the OS
+//! backend's apps and outputs through [`Observer`], which never captures anything.
 
 use std::fs::File;
 use std::io::BufWriter;
@@ -9,6 +10,43 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use eframe::egui::{self, ColorImage, Context, UserData, ViewportCommand};
+use sidestage_platform::{AudioApp, HideMethod, OutputDevice, Platform, Session, SessionConfig, Support};
+
+/// The OS backend as an unattended screenshot run sees it: apps, outputs and hide methods, but
+/// no session and no undoing of an earlier run's leftovers. Whatever the window is clicked into
+/// while the screenshot settles, no app is hidden and nothing the user's own Sidestage changed
+/// is touched.
+pub struct Observer(pub Box<dyn Platform>);
+
+impl Platform for Observer {
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    fn support(&self) -> Support {
+        self.0.support()
+    }
+
+    fn list_apps(&mut self) -> anyhow::Result<Vec<AudioApp>> {
+        self.0.list_apps()
+    }
+
+    fn list_outputs(&mut self) -> anyhow::Result<Vec<OutputDevice>> {
+        self.0.list_outputs()
+    }
+
+    fn hide_methods(&mut self) -> Vec<(HideMethod, String)> {
+        self.0.hide_methods()
+    }
+
+    fn start(&mut self, _config: SessionConfig) -> anyhow::Result<Box<dyn Session>> {
+        anyhow::bail!("screenshot runs never capture")
+    }
+
+    fn recover(&mut self) -> anyhow::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+}
 
 /// Long enough for the demo engine to start its session and the meters to move.
 const SETTLE: Duration = Duration::from_millis(1800);
@@ -82,4 +120,40 @@ fn save(path: &Path, image: &ColorImage) -> anyhow::Result<()> {
     writer.write_image_data(&bytes)?;
     writer.finish()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use sidestage_platform::{AppKey, SourceConfig};
+
+    use super::*;
+    use crate::demo::{DemoPlatform, Scenario};
+
+    #[test]
+    fn observer_lists_but_never_captures_or_restores() {
+        let starts = Arc::new(AtomicUsize::new(0));
+        let demo = DemoPlatform::new(Scenario { warnings: true, ..Scenario::default() })
+            .with_start_counter(Arc::clone(&starts));
+        let mut observer = Observer(Box::new(demo));
+        assert!(!observer.list_apps().unwrap().is_empty(), "the apps are listed");
+        assert!(!observer.list_outputs().unwrap().is_empty());
+        assert!(observer.recover().unwrap().is_empty(), "an earlier run's leftovers are not touched");
+        let config = SessionConfig {
+            output: None,
+            sidechain: true,
+            sidechain_ignore: Vec::new(),
+            sources: vec![SourceConfig {
+                id: 1,
+                app: AppKey("demo:spotify".into()),
+                hide: HideMethod::Auto,
+                processor: crate::processor::master_factory(),
+            }],
+            master: crate::processor::master_factory(),
+        };
+        assert!(observer.start(config).is_err());
+        assert_eq!(starts.load(Ordering::Relaxed), 0, "the backend was never asked to start");
+    }
 }

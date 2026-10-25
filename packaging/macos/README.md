@@ -1,7 +1,7 @@
 # Sidestage on macOS
 
-Sidestage needs **macOS 14.2 or newer**: it captures the chosen app with a Core Audio process
-tap, which macOS 14.2 introduced.
+Sidestage needs **macOS 14.2 or newer**: it captures each app you add with a Core Audio
+process tap, which macOS 14.2 introduced.
 
 ## Build the app
 
@@ -40,6 +40,6 @@ Sidestage receives silence.
 * To ask again from scratch: `tccutil reset All com.pixityy.sidestage`.
 
 While a start waits for the prompt, Sidestage's status says that macOS may be asking. If
-permission is denied, Sidestage says so and stops (the app is un-muted at once); allow it in
+permission is denied, Sidestage says so and stops (the apps are un-muted at once); allow it in
 System Settings > Privacy & Security > Screen & System Audio Recording and start again, or quit
 and reopen Sidestage if it still fails.

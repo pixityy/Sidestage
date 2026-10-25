@@ -42,6 +42,8 @@ pub struct Palette {
     pub err: Color32,
     pub info: Color32,
     pub meter_bg: Color32,
+    /// One colour per source on the radar and in the source list (see `Source::color`).
+    pub pucks: [Color32; crate::config::SOURCE_COLORS as usize],
 }
 
 pub const DARK: Palette = Palette {
@@ -64,6 +66,16 @@ pub const DARK: Palette = Palette {
     err: Color32::from_rgb(0xF3, 0x6A, 0x6A),
     info: Color32::from_rgb(0x6C, 0xB4, 0xFF),
     meter_bg: Color32::from_rgb(0x24, 0x27, 0x31),
+    pucks: [
+        Color32::from_rgb(0x8F, 0x7C, 0xFF),
+        Color32::from_rgb(0x2F, 0xC2, 0xA8),
+        Color32::from_rgb(0xFF, 0x7A, 0x6B),
+        Color32::from_rgb(0x4F, 0xA8, 0xFF),
+        Color32::from_rgb(0xA3, 0xD9, 0x4E),
+        Color32::from_rgb(0xE0, 0x6B, 0xD0),
+        Color32::from_rgb(0xE8, 0xBE, 0x4F),
+        Color32::from_rgb(0x9A, 0xA8, 0xC4),
+    ],
 };
 
 pub const LIGHT: Palette = Palette {
@@ -87,7 +99,39 @@ pub const LIGHT: Palette = Palette {
     err: Color32::from_rgb(0xC2, 0x34, 0x34),
     info: Color32::from_rgb(0x1F, 0x68, 0xC8),
     meter_bg: Color32::from_rgb(0xE3, 0xE5, 0xEC),
+    pucks: [
+        Color32::from_rgb(0x5E, 0x48, 0xE8),
+        Color32::from_rgb(0x0E, 0x8C, 0x77),
+        Color32::from_rgb(0xD6, 0x45, 0x38),
+        Color32::from_rgb(0x1F, 0x6F, 0xD1),
+        Color32::from_rgb(0x4B, 0x8A, 0x12),
+        Color32::from_rgb(0xB0, 0x38, 0x9E),
+        Color32::from_rgb(0x76, 0x6E, 0x00),
+        Color32::from_rgb(0x55, 0x66, 0x88),
+    ],
 };
+
+impl Palette {
+    /// The colour of a source (its `color` index wraps around the palette).
+    pub fn puck(&self, index: u8) -> Color32 {
+        self.pucks[usize::from(index) % self.pucks.len()]
+    }
+}
+
+/// Black or white, whichever reads better on `fill` (a source's initial on its puck).
+pub fn text_on(fill: Color32) -> Color32 {
+    let lin = |c: u8| {
+        let c = f32::from(c) / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let luminance = 0.2126 * lin(fill.r()) + 0.7152 * lin(fill.g()) + 0.0722 * lin(fill.b());
+    // Contrast with white (1.05 / (L + 0.05)) against contrast with black ((L + 0.05) / 0.05).
+    if 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05 {
+        Color32::WHITE
+    } else {
+        Color32::from_rgb(0x10, 0x11, 0x16)
+    }
+}
 
 /// The palette of the theme egui is currently showing.
 pub fn palette(ctx: &Context) -> &'static Palette {
@@ -252,4 +296,22 @@ pub fn icon() -> Arc<IconData> {
 /// Anti-aliased inside-ness of a signed distance (negative = inside).
 fn coverage(distance: f32, aa: f32) -> f32 {
     (0.5 - distance / aa).clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_colours_are_distinct_and_labelled_readably() {
+        for p in [&DARK, &LIGHT] {
+            for (i, a) in p.pucks.iter().enumerate() {
+                assert!(p.pucks[i + 1..].iter().all(|b| a != b), "colour {i} repeats");
+                assert_ne!(*a, p.warn, "the ducking pulse must stand out from every source");
+            }
+            assert_eq!(p.puck(0), p.puck(crate::config::SOURCE_COLORS));
+        }
+        assert_eq!(text_on(Color32::from_rgb(0x5E, 0x48, 0xE8)), Color32::WHITE);
+        assert_ne!(text_on(Color32::from_rgb(0xE8, 0xBE, 0x4F)), Color32::WHITE);
+    }
 }

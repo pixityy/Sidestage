@@ -1,2 +1,7 @@
 * text=auto
 *.sh text eol=lf
+# Media and test audio: never line-ending converted, diffed or merged as text.
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.wav binary

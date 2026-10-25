@@ -1,9 +1,10 @@
-//! The real-time renderer: wires the voices, room, ducker and limiter together.
+//! The real-time renderer: wires the leveller, voices, room, ducker and limiter together.
 //!
 //! ```text
-//! music ─┬─► voice (2 virtual speakers ─► ITD + head shadow ─► rear/elevation cues ─► distance)
-//!        │      + room wet ─► tone (HPF, muffle LPF, bass shelf, presence dip)
-//!        └─► room (early reflections + FDN late reverb, constant send)
+//! music ─► leveller ─┬─► voice (2 virtual speakers ─► ITD + head shadow ─► rear/elevation cues
+//!                    │          ─► distance) + room wet
+//!                    │      ─► tone (HPF, muffle LPF, bass shelf, presence dip, clarity bell)
+//!                    └─► room (early reflections + FDN late reverb, constant send)
 //!   ─► ducker (dynamic 3.2 kHz dip + broadband gain) ─► volume ─► limiter ─► bypass crossfade
 //! ```
 //!
@@ -15,6 +16,7 @@ use std::sync::Arc;
 
 use crate::biquad::{Svf2, SvfCoefs};
 use crate::ducker::Ducker;
+use crate::leveler::Leveler;
 use crate::limiter::Limiter;
 use crate::params::{Settings, SharedParams};
 use crate::reverb::Reverb;
@@ -50,6 +52,8 @@ pub struct Spatializer {
     fs: f32,
     params: Arc<SharedParams>,
     settings: Settings,
+    /// Evens out the input level before anything else hears it ([`Settings::leveler`]).
+    leveler: Leveler,
     /// Two renderings of the direct sound, so far jumps crossfade instead of sweeping.
     voices: [Voice; 2],
     active: usize,
@@ -98,6 +102,7 @@ impl Spatializer {
         Self {
             sample_rate,
             fs,
+            leveler: Leveler::new(fs),
             voices: [Voice::new(fs, &settings), Voice::new(fs, &settings)],
             active: 0,
             xfade: None,
@@ -121,17 +126,38 @@ impl Spatializer {
         self.sample_rate
     }
 
+    /// The settings the last block was rendered with (for the app's real-time wrapper, e.g. to
+    /// see whether this source is voice chat).
+    pub fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
     /// Render one block. `input`/`output`: interleaved stereo, equal length, any even size.
-    /// `sidechain_peak`: recent linear peak of "everything but the music" (0 if unavailable).
+    /// `sidechain_peak`: recent linear peak of the game (0 if unavailable).
     /// Real-time safe: no allocation, locks or panics.
     pub fn process(&mut self, input: &[f32], output: &mut [f32], sidechain_peak: f32) {
+        self.process_with_voice(input, output, sidechain_peak, 0.0);
+    }
+
+    /// [`Spatializer::process`] with a second ducking trigger: `voice_peak` is the recent linear
+    /// peak of the session's voice-chat sources ([`Settings::voice_chat`]), 0 if none. The ducker
+    /// follows the game when [`crate::Ducking::enabled`] and the voice when
+    /// [`crate::Ducking::under_voice`], whichever is louder. The sidechain meter always shows
+    /// `game_peak`, whether or not this source ducks for it.
+    pub fn process_with_voice(&mut self, input: &[f32], output: &mut [f32], game_peak: f32, voice_peak: f32) {
         if let Some(s) = self.params.try_get() {
             self.settings = s.sanitized();
         }
         let frames = input.len().min(output.len()) / 2;
         let (output, rest) = output.split_at_mut(frames * 2);
         rest.fill(0.0);
-        let sidechain = if sidechain_peak.is_finite() { sidechain_peak.abs().min(INPUT_LIMIT) } else { 0.0 };
+        let clean = |p: f32| if p.is_finite() { p.abs().min(INPUT_LIMIT) } else { 0.0 };
+        let d = self.settings.ducking;
+        // The meter shows the game level even while ducking under it is off.
+        let game_level = clean(game_peak);
+        let game = if d.enabled { game_level } else { 0.0 };
+        let voice = if d.under_voice { clean(voice_peak) } else { 0.0 };
+        let sidechain = game.max(voice);
 
         let (mut in_peak, mut out_peak) = (0.0f32, 0.0f32);
         for (inp, out) in input[..frames * 2].chunks(2 * SUB_BLOCK).zip(output.chunks_mut(2 * SUB_BLOCK)) {
@@ -139,7 +165,7 @@ impl Spatializer {
             in_peak = in_peak.max(i);
             out_peak = out_peak.max(o);
         }
-        self.params.meters.report(in_peak, out_peak, sidechain, self.ducker.reduction_db());
+        self.params.meters.report(in_peak, out_peak, game_level, self.ducker.reduction_db());
     }
 
     /// One sub-block of at most [`SUB_BLOCK`] interleaved frames. Returns (input, output) peaks.
@@ -202,7 +228,13 @@ impl Spatializer {
 
     fn render(&mut self, x: &[[f32; SUB_BLOCK]; 2], y: &mut [[f32; SUB_BLOCK]; 2], n: usize, reduction: f32) {
         let s = self.settings;
-        let xin = [&x[0][..n], &x[1][..n]];
+        // The leveller works on a copy: the bypass crossfade needs the untouched input.
+        let mut lev = *x;
+        {
+            let [ll, lr] = &mut lev;
+            self.leveler.process(&mut ll[..n], &mut lr[..n], s.leveler);
+        }
+        let xin = [&lev[0][..n], &lev[1][..n]];
 
         let mut wet = [[0.0f32; SUB_BLOCK]; 2];
         self.reverb.update(s.room, s.reverb_db, n);
@@ -295,12 +327,14 @@ impl Spatializer {
         }
         self.xfade = None;
         self.xfade_mix.snap(0.0);
+        self.leveler.reset();
         self.reverb.clear();
         self.duck_eq.reset();
         self.limiter.reset();
     }
 
     fn flush(&mut self) {
+        self.leveler.flush();
         self.voices[self.active].flush();
         if self.xfade.is_some() {
             self.voices[1 - self.active].flush();

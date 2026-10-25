@@ -73,6 +73,9 @@ pub fn dry_settings(azimuth_deg: f32, width_deg: f32) -> Settings {
         reverb_db: -40.0,
         ducking: DuckMode::Off.ducking(),
         bypass: false,
+        clarity_db: 0.0,
+        leveler: 0.0,
+        voice_chat: false,
     }
 }
 
@@ -250,4 +253,174 @@ pub fn run_with_change(from: Settings, to: Settings, fs: u32, input: &[f32], at:
         sp.process(i, o, 0.0);
     }
     out
+}
+
+/// Stereo pink noise at about -20 dBFS RMS with a typical music-like inter-channel correlation
+/// (~0.6), `seconds` long at [`FS`].
+pub fn music_like(seed: u64, seconds: f32) -> Vec<f32> {
+    let mut rng = Rng::new(seed);
+    let (mut c, mut l, mut r) = (Pink::new(), Pink::new(), Pink::new());
+    let frames = (seconds * FS as f32) as usize;
+    let mut out = Vec::with_capacity(frames * 2);
+    for _ in 0..frames {
+        let common = c.next(rng.white());
+        out.push(0.08 * (common + 0.8 * l.next(rng.white())));
+        out.push(0.08 * (common + 0.8 * r.next(rng.white())));
+    }
+    out
+}
+
+/// Direct-form biquad in f64 (RBJ cookbook), for building test signals.
+#[derive(Clone, Copy)]
+pub struct Biquad {
+    b: [f64; 3],
+    a: [f64; 2],
+    z: [f64; 2],
+}
+
+impl Biquad {
+    pub fn new(b: [f64; 3], a: [f64; 3]) -> Self {
+        Self { b: b.map(|v| v / a[0]), a: [a[1] / a[0], a[2] / a[0]], z: [0.0; 2] }
+    }
+
+    fn rbj(hz: f64, q: f64, fs: u32) -> (f64, f64) {
+        let w = 2.0 * PI * hz / fs as f64;
+        (w.cos(), w.sin() / (2.0 * q))
+    }
+
+    pub fn highpass(hz: f64, q: f64, fs: u32) -> Self {
+        let (c, al) = Self::rbj(hz, q, fs);
+        Self::new([(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0], [1.0 + al, -2.0 * c, 1.0 - al])
+    }
+
+    pub fn lowpass(hz: f64, q: f64, fs: u32) -> Self {
+        let (c, al) = Self::rbj(hz, q, fs);
+        Self::new([(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0], [1.0 + al, -2.0 * c, 1.0 - al])
+    }
+
+    pub fn tick(&mut self, x: f64) -> f64 {
+        let y = self.b[0] * x + self.z[0];
+        self.z[0] = self.b[1] * x - self.a[0] * y + self.z[1];
+        self.z[1] = self.b[2] * x - self.a[1] * y;
+        y
+    }
+}
+
+/// ITU-R BS.1770 K-weighting (48 kHz coefficients from the standard).
+fn k_weight(x: &[f32]) -> Vec<f64> {
+    let mut shelf = Biquad::new(
+        [1.535_124_859_586_97, -2.691_696_189_406_38, 1.198_392_810_852_85],
+        [1.0, -1.690_659_293_182_41, 0.732_480_774_215_85],
+    );
+    let mut rlb = Biquad::new([1.0, -2.0, 1.0], [1.0, -1.990_047_454_833_98, 0.990_072_250_366_21]);
+    x.iter().map(|&v| rlb.tick(shelf.tick(v as f64))).collect()
+}
+
+/// Integrated loudness (LUFS) of interleaved stereo at 48 kHz: BS.1770 K-weighting, 400 ms
+/// blocks with 75 % overlap, absolute (-70) and relative (-10 LU) gates, so pauses in speech do
+/// not count.
+pub fn lufs(x: &[f32], fs: u32) -> f64 {
+    assert_eq!(fs, 48_000, "the K-weighting coefficients are for 48 kHz");
+    let (l, r) = split(x);
+    let (kl, kr) = (k_weight(&l), k_weight(&r));
+    let block = (0.4 * fs as f64) as usize;
+    let mut z = Vec::new();
+    let mut start = 0;
+    while start + block <= kl.len() {
+        let e: f64 = kl[start..start + block].iter().chain(&kr[start..start + block]).map(|v| v * v).sum();
+        z.push(e / block as f64);
+        start += block / 4;
+    }
+    let loud = |ms: f64| -0.691 + 10.0 * ms.max(1e-30).log10();
+    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
+    let abs: Vec<f64> = z.iter().copied().filter(|&m| loud(m) > -70.0).collect();
+    let rel = loud(mean(&abs)) - 10.0;
+    let gated: Vec<f64> = abs.into_iter().filter(|&m| loud(m) > rel).collect();
+    loud(mean(&gated))
+}
+
+/// Typical integrated loudness of speech arriving from voice chat or a video, LUFS. Voice chat
+/// usually lands around -18 to -24 LUFS and loudness-normalized podcasts and videos around -14 to
+/// -16; the leveller pulls both toward its reference.
+pub const SPEECH_LUFS: f64 = -20.0;
+
+/// Speech-like test signal at [`FS`]: noise with the long-term spectrum of speech (100 Hz
+/// high-pass, about -6 dB/octave above 600 Hz and -12 above 2.5 kHz), in 120-260 ms syllables
+/// with ±3 dB of level variation, 4-10 to a phrase, phrases separated by 0.3-0.8 s pauses. A
+/// -70 dBFS noise floor runs underneath (what Discord's noise suppression leaves). Mono on both
+/// channels like voice chat, normalized to `lufs` integrated loudness.
+pub fn speech_like(seed: u64, seconds: f32, lufs_target: f64) -> Vec<f32> {
+    let mut rng = Rng::new(seed);
+    let frames = (seconds * FS as f32) as usize;
+    let mut env = vec![0.0f32; frames];
+    let mut t = (0.05 * FS as f32) as usize;
+    'outer: loop {
+        let syllables = 4 + (rng.next_u64() % 7) as usize;
+        for _ in 0..syllables {
+            let len = (rng.range(0.12, 0.26) * FS as f32) as usize;
+            let amp = 10f32.powf(rng.range(-3.0, 3.0) / 20.0);
+            for i in 0..len {
+                if t + i >= frames {
+                    break 'outer;
+                }
+                env[t + i] = amp * (std::f32::consts::PI * i as f32 / len as f32).sin();
+            }
+            t += len + (rng.range(0.02, 0.06) * FS as f32) as usize;
+        }
+        t += (rng.range(0.3, 0.8) * FS as f32) as usize;
+        if t >= frames {
+            break;
+        }
+    }
+    let mut hp = Biquad::highpass(100.0, std::f64::consts::FRAC_1_SQRT_2, FS);
+    let (mut lp1, mut lp2) = (0.0f64, 0.0f64);
+    let a1 = 1.0 - (-2.0 * PI * 600.0 / FS as f64).exp();
+    let a2 = 1.0 - (-2.0 * PI * 2500.0 / FS as f64).exp();
+    let mono: Vec<f32> = env
+        .iter()
+        .map(|&e| {
+            let x = hp.tick(rng.white() as f64);
+            lp1 += a1 * (x - lp1);
+            lp2 += a2 * (lp1 - lp2);
+            (lp2 * e as f64) as f32
+        })
+        .collect();
+    let stereo = interleave(&mono, &mono);
+    let gain = 10f64.powf((lufs_target - lufs(&stereo, FS)) / 20.0) as f32;
+    let floor = 10f32.powf(-70.0 / 20.0);
+    stereo
+        .chunks(2)
+        .flat_map(|f| {
+            let n = floor * rng.white();
+            [f[0] * gain + n, f[1] * gain + n]
+        })
+        .collect()
+}
+
+/// Speech-shaped continuous noise (the spectrum of [`speech_like`] without the syllables), mono
+/// on both channels, about -20 dBFS RMS.
+pub fn speech_noise(seed: u64, seconds: f32) -> Vec<f32> {
+    let mut rng = Rng::new(seed);
+    let frames = (seconds * FS as f32) as usize;
+    let mut hp = Biquad::highpass(100.0, std::f64::consts::FRAC_1_SQRT_2, FS);
+    let (mut lp1, mut lp2) = (0.0f64, 0.0f64);
+    let a1 = 1.0 - (-2.0 * PI * 600.0 / FS as f64).exp();
+    let a2 = 1.0 - (-2.0 * PI * 2500.0 / FS as f64).exp();
+    let mono: Vec<f32> = (0..frames)
+        .map(|_| {
+            let x = hp.tick(rng.white() as f64);
+            lp1 += a1 * (x - lp1);
+            lp2 += a2 * (lp1 - lp2);
+            lp2 as f32
+        })
+        .collect();
+    let g = 0.1 / rms(&mono) as f32;
+    let mono: Vec<f32> = mono.iter().map(|v| v * g).collect();
+    interleave(&mono, &mono)
+}
+
+/// `x` scaled by `db`.
+pub fn gain_db(x: &[f32], db: f64) -> Vec<f32> {
+    let g = 10f64.powf(db / 20.0) as f32;
+    x.iter().map(|v| v * g).collect()
 }

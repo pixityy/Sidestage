@@ -5,17 +5,20 @@
 //! `-EINVAL`), and only PulseAudio 15+ knows `norewinds=`. Old PulseAudio rejects unknown keys
 //! too. So the arguments are built per server, as a list of attempts from richest to plainest.
 
-/// Every capture sink Sidestage creates is named `sidestage_music_<random hex>`. The random
-/// suffix matters: PulseAudio's stream-restore and WirePlumber persist every move by sink name,
-/// so a fresh name per session guarantees those saved routes never pull an app into a later
-/// Sidestage sink. The prefix is how leftovers from a crash are found.
+/// Every capture sink Sidestage creates (one per source) is named `sidestage_music_<random
+/// hex>`. The random suffix matters: PulseAudio's stream-restore and WirePlumber persist every
+/// move by sink name, so a fresh name per sink guarantees those saved routes never pull an app
+/// into a later Sidestage sink. The prefix is how leftovers from a crash are found (and it stays
+/// "music" so leftovers of Sidestage 0.1 are found too).
 pub const SINK_PREFIX: &str = "sidestage_music_";
 
 /// Sample rate of the capture sink, the capture stream and the output stream.
 pub const RATE: u32 = 48_000;
 
-/// Shown in sound settings for the capture sink.
-const SINK_DESCRIPTION: &str = "Sidestage Music Capture";
+/// Shown in sound settings for a capture sink, followed by the source's app.
+const SINK_DESCRIPTION: &str = "Sidestage Capture";
+/// Longest app label put into a sink description.
+const LABEL_MAX_CHARS: usize = 40;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ServerKind {
@@ -82,15 +85,47 @@ pub fn is_sidestage_sink(name: &str) -> bool {
     name.len() > SINK_PREFIX.len() && name.starts_with(SINK_PREFIX)
 }
 
+/// Whether a raw tagstruct (part of a control packet) holds a string that names a Sidestage
+/// capture sink. The audio thread learns where the server moved its stream this way: decoding
+/// the packet would allocate the sink name.
+pub fn names_sidestage_sink(tagstruct: &[u8]) -> bool {
+    // A string is 't', its bytes, then NUL; the name must go on after the prefix.
+    let prefix = SINK_PREFIX.as_bytes();
+    tagstruct.windows(prefix.len() + 2).any(|w| w[0] == b't' && &w[1..=prefix.len()] == prefix && w[w.len() - 1] != 0)
+}
+
+/// The description of the capture sink for the app `label` (its key or name), e.g. "Sidestage
+/// Capture - spotify", so several sources' sinks can be told apart in sound settings.
+///
+/// The label comes from the app's stream properties and ends up inside a quoted value of the
+/// module arguments, so it is reduced to letters, digits, spaces and `.`, `-`, `_`, `+`: a quote,
+/// `=` or backslash could otherwise end the value early and smuggle in other arguments (such as
+/// another `sink_name=`, which the leftover sweep trusts).
+pub fn sink_description(label: &str) -> String {
+    let label = label.rsplit('/').next().unwrap_or(label);
+    let mut clean = String::new();
+    for c in label.chars() {
+        let c = if c.is_whitespace() { ' ' } else { c };
+        if (c.is_alphanumeric() || " .-_+".contains(c)) && !(c == ' ' && (clean.is_empty() || clean.ends_with(' '))) {
+            clean.push(c);
+        }
+        if clean.chars().count() >= LABEL_MAX_CHARS {
+            break;
+        }
+    }
+    let clean = clean.trim_end();
+    if clean.is_empty() { SINK_DESCRIPTION.to_owned() } else { format!("{SINK_DESCRIPTION} - {clean}") }
+}
+
 /// `module-null-sink` argument strings to try in order, richest first. Each later attempt drops
 /// something an older or stricter server might reject: first `norewinds=`, then the quoted
 /// `sink_properties=` (its nested quoting is parsed by both servers' code, but a plain fallback
-/// costs nothing).
-pub fn null_sink_args(kind: &ServerKind, sink_name: &str) -> Vec<String> {
+/// costs nothing). `label` names the source's app, see [`sink_description`].
+pub fn null_sink_args(kind: &ServerKind, sink_name: &str, label: &str) -> Vec<String> {
     let base =
         format!("sink_name={sink_name} format=float32le rate={RATE} channels=2 channel_map=front-left,front-right");
-    let props =
-        format!("sink_properties=\"device.description='{SINK_DESCRIPTION}' node.description='{SINK_DESCRIPTION}'\"");
+    let description = sink_description(label);
+    let props = format!("sink_properties=\"device.description='{description}' node.description='{description}'\"");
     let mut attempts = Vec::with_capacity(3);
     if kind.supports_norewinds() {
         attempts.push(format!("{base} {props} norewinds=1"));
@@ -157,25 +192,60 @@ mod tests {
         assert_eq!(name, "sidestage_music_beef12345678");
         assert!(is_sidestage_sink(&name) && !is_sidestage_sink(SINK_PREFIX) && !is_sidestage_sink("alsa_output.pci"));
 
-        let pw = null_sink_args(&ServerKind::PipeWire { version: "1.2".into() }, &name);
+        let pw = null_sink_args(&ServerKind::PipeWire { version: "1.2".into() }, &name, "spotify");
         assert_eq!(pw.len(), 2);
         assert!(
             pw.iter().all(|a| !a.contains("norewinds") && !a.contains("formats=")),
             "pipewire-pulse rejects unknown keys"
         );
-        assert!(pw[0].contains("sink_properties=\"device.description='Sidestage Music Capture'"));
+        assert!(pw[0].contains("sink_properties=\"device.description='Sidestage Capture - spotify'"));
         assert!(pw[1].starts_with(&format!("sink_name={name} ")) && !pw[1].contains("sink_properties"));
 
-        let pa16 = null_sink_args(&ServerKind::PulseAudio { version: Some((16, 1)) }, &name);
+        let pa16 = null_sink_args(&ServerKind::PulseAudio { version: Some((16, 1)) }, &name, "spotify");
         assert_eq!(pa16.len(), 3);
         assert!(pa16[0].ends_with(" norewinds=1") && !pa16[1].contains("norewinds"));
 
-        let pa14 = null_sink_args(&ServerKind::PulseAudio { version: Some((14, 2)) }, &name);
+        let pa14 = null_sink_args(&ServerKind::PulseAudio { version: Some((14, 2)) }, &name, "spotify");
         assert!(pa14.iter().all(|a| !a.contains("norewinds")));
         for args in pa16.iter().chain(&pw) {
             assert!(args.contains("format=float32le rate=48000 channels=2 channel_map=front-left,front-right"));
             assert_eq!(sidestage_sink_in_args(args), Some(name.as_str()));
         }
+    }
+
+    #[test]
+    fn descriptions_name_the_app_and_cannot_break_the_arguments() {
+        assert_eq!(sink_description("spotify"), "Sidestage Capture - spotify");
+        assert_eq!(sink_description("/usr/lib/firefox/firefox"), "Sidestage Capture - firefox");
+        assert_eq!(sink_description("Müsik  Player	2"), "Sidestage Capture - Müsik Player 2");
+        assert_eq!(sink_description(""), "Sidestage Capture");
+        assert_eq!(sink_description("'\"=\\"), "Sidestage Capture");
+        assert_eq!(sink_description(&"x".repeat(100)), format!("Sidestage Capture - {}", "x".repeat(40)));
+        let hostile = "a' sink_name=sidestage_music_evil b=\"c";
+        let description = sink_description(hostile);
+        assert!(!description.contains(['\'', '"', '=', '\\']), "{description}");
+        let args = null_sink_args(&ServerKind::PipeWire { version: "1.2".into() }, "sidestage_music_abc", hostile);
+        for a in &args {
+            assert_eq!(sidestage_sink_in_args(a), Some("sidestage_music_abc"));
+            assert_eq!(a.matches("sink_name=").count(), 1, "{a}");
+        }
+    }
+
+    #[test]
+    fn spots_our_sinks_in_raw_packets() {
+        // The tail of a PlaybackStreamMoved: sink index, sink name, suspended flag.
+        let moved = |name: &str| {
+            let mut b = vec![b'L', 0, 0, 0, 7, b't'];
+            b.extend_from_slice(name.as_bytes());
+            b.extend_from_slice(&[0, b'0']);
+            b
+        };
+        assert!(names_sidestage_sink(&moved("sidestage_music_beef12345678")));
+        assert!(!names_sidestage_sink(&moved("alsa_output.usb-headset")));
+        assert!(!names_sidestage_sink(&moved("my_sidestage_music_x")), "only a name that starts with it");
+        assert!(!names_sidestage_sink(&moved("sidestage_music_")), "the bare prefix is no sink");
+        assert!(!names_sidestage_sink(b"tsidestage_music"), "a cut-off packet");
+        assert!(!names_sidestage_sink(&[]));
     }
 
     #[test]

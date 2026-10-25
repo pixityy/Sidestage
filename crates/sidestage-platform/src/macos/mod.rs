@@ -1,25 +1,29 @@
 //! macOS backend: Core Audio process taps (macOS 14.2+).
 //!
-//! * **Capture and hide**: a private `CATapDescription` over every process object of the chosen
-//!   app with `CATapMutedWhenTapped`. macOS silences the app's own output while Sidestage reads
-//!   the tap and un-silences it the moment the tap is destroyed, also when Sidestage crashes
-//!   (taps and private aggregates belong to the process that created them). Nothing outlives
-//!   the process, so there is nothing to journal, guard or recover.
-//! * **Output**: a private aggregate device whose main (clock) sub-device is the headphone
-//!   output and whose tap list holds the tap. One IOProc reads the tap (the trailing input
-//!   streams) and writes the rendered audio to the output streams in the same cycle: one clock,
-//!   so no ring buffer, resampler or drift control.
-//! * **Sidechain**: a second, unmuted global tap that excludes the music app and Sidestage, in
-//!   a tap-only private aggregate whose IOProc only measures a peak.
+//! * **Capture and hide**: per source, a private `CATapDescription` over every process object of
+//!   its app with `CATapMutedWhenTapped`. macOS silences the app's own output while Sidestage
+//!   reads the tap and un-silences it the moment the tap is destroyed, also when Sidestage
+//!   crashes (taps and private aggregates belong to the process that created them). Nothing
+//!   outlives the process, so there is nothing to journal, guard or recover.
+//! * **Output**: one private aggregate device per session whose main (clock) sub-device is the
+//!   headphone output and whose tap list holds every source's tap. One IOProc reads each tap
+//!   (trailing input streams), runs that source's processor, sums, runs the master processor and
+//!   writes the output in the same cycle: one clock, so no ring buffer, resampler or drift
+//!   control. Changing the sources builds a new aggregate next to the running one and hands
+//!   over to it (`engine.rs` explains why and what kept sources hear).
+//! * **Sidechain**: a second, unmuted global tap that excludes every source's app, the ignored
+//!   apps and Sidestage, in a tap-only private aggregate whose IOProc only measures a peak. Its
+//!   exclusion list is rewritten in place as sources and processes come and go.
 //!
-//! `group`, `plan`, `render`, `sys` and `worker` are pure logic, unit-tested without Core
-//! Audio; `ca` wraps Core Audio, `procs` and `devices` enumerate apps and outputs, `engine`
+//! `group`, `plan`, `render`, `sources`, `sys` and `worker` are pure logic, unit-tested without
+//! Core Audio; `ca` wraps Core Audio, `procs` and `devices` enumerate apps and outputs, `engine`
 //! assembles taps, aggregates and IOProcs, and `session` runs the control thread.
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 
 mod group;
 mod plan;
 mod render;
+mod sources;
 mod sys;
 mod worker;
 
@@ -47,6 +51,7 @@ pub fn run_helper(args: &[String]) -> i32 {
 #[cfg(target_os = "macos")]
 mod platform {
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex, PoisonError};
     use std::time::{Duration, Instant};
 
@@ -59,9 +64,7 @@ mod platform {
     use super::sys::OsVersion;
     use super::worker::{Answer, Worker};
     use super::{ca, devices};
-    use crate::{
-        AppKey, AudioApp, HideMethod, OutputDevice, Platform, ProcessorFactory, Session, SessionConfig, Support,
-    };
+    use crate::{AppKey, AudioApp, HideMethod, OutputDevice, Platform, Session, SessionConfig, Support};
 
     /// Apps that played this recently stay in the picker while paused.
     const RECENTLY_PLAYED: Duration = Duration::from_secs(15 * 60);
@@ -96,6 +99,7 @@ mod platform {
             recent: HashMap::new(),
             last_apps: None,
             last_outputs: None,
+            session_running: Arc::new(AtomicBool::new(false)),
         }))
     }
 
@@ -113,6 +117,10 @@ mod platform {
         /// Last answers, for when a query is slow; `None` until the first one.
         last_apps: Option<Vec<AudioApp>>,
         last_outputs: Option<Vec<OutputDevice>>,
+        /// A session's control thread is alive. Only one session at a time: a second one would
+        /// tap (and play) the same apps again. Cleared by the thread itself once its Core
+        /// Audio objects are gone, which can be after `stop` returned if Core Audio was stuck.
+        session_running: Arc<AtomicBool>,
     }
 
     /// How long a picker query may take. The first one gets longer: its bundle lookups are
@@ -211,22 +219,37 @@ mod platform {
             ]
         }
 
-        fn start(&mut self, config: SessionConfig, processor: ProcessorFactory) -> anyhow::Result<Box<dyn Session>> {
+        fn start(&mut self, config: SessionConfig) -> anyhow::Result<Box<dyn Session>> {
             if let Some(why) = self.unsupported() {
                 anyhow::bail!(why);
             }
-            if config.app.0.is_empty() {
-                anyhow::bail!("no app selected");
+            if let Some(e) = SessionConfig::duplicate_error(&config.sources) {
+                anyhow::bail!(e);
+            }
+            if self.session_running.swap(true, Ordering::AcqRel) {
+                anyhow::bail!("Sidestage's previous audio session is still shutting down; try again in a moment");
             }
             log::info!(
-                "starting macOS session for {} (output {:?}, hide {:?}, sidechain {})",
-                config.app.0,
+                "starting macOS session: {} source(s) {:?}, output {:?}, sidechain {} (ignoring {:?})",
+                config.sources.len(),
+                config.sources.iter().map(|s| (s.id, &s.app.0, &s.hide)).collect::<Vec<_>>(),
                 config.output,
-                config.hide,
-                config.sidechain
+                config.sidechain,
+                config.sidechain_ignore,
             );
-            let session = MacSession::start(config, processor, self.permission.clone(), self.me.clone(), self.os)?;
-            Ok(Box::new(session))
+            match MacSession::start(
+                config,
+                self.permission.clone(),
+                self.me.clone(),
+                self.os,
+                self.session_running.clone(),
+            ) {
+                Ok(session) => Ok(Box::new(session)),
+                Err(e) => {
+                    self.session_running.store(false, Ordering::Release);
+                    Err(e)
+                }
+            }
         }
 
         fn recover(&mut self) -> anyhow::Result<Vec<String>> {

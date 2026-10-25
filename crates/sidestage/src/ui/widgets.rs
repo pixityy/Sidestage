@@ -23,8 +23,13 @@ pub fn section(ui: &mut Ui, p: &Palette, text: &str) {
 
 /// An iOS-style on/off switch. `label` is its name for screen readers.
 pub fn toggle(ui: &mut Ui, p: &Palette, on: &mut bool, size: f32, label: &str) -> Response {
-    let desired = vec2(size * 1.8, size);
-    let (rect, mut response) = ui.allocate_exact_size(desired, Sense::click());
+    let (rect, _) = ui.allocate_exact_size(vec2(size * 1.8, size), Sense::hover());
+    toggle_at(ui, p, rect, ui.id().with(("toggle", label)), on, label)
+}
+
+/// [`toggle`] in a given rectangle (inside custom-painted rows).
+pub fn toggle_at(ui: &mut Ui, p: &Palette, rect: egui::Rect, id: egui::Id, on: &mut bool, label: &str) -> Response {
+    let mut response = ui.interact(rect, id, Sense::click());
     if response.clicked() {
         *on = !*on;
         response.mark_changed();
@@ -37,7 +42,7 @@ pub fn toggle(ui: &mut Ui, p: &Palette, on: &mut bool, size: f32, label: &str) -
         let r = rect.height() / 2.0;
         ui.painter().rect_filled(rect, CornerRadius::same(r as u8), fill);
         let knob_x = egui::lerp((rect.left() + r)..=(rect.right() - r), t);
-        ui.painter().circle_filled(pos2(knob_x, rect.center().y), r - 3.0, Color32::WHITE);
+        ui.painter().circle_filled(pos2(knob_x, rect.center().y), (r - 3.0).max(2.0), Color32::WHITE);
         if response.has_focus() {
             ui.painter().rect_stroke(
                 rect.expand(2.0),
@@ -48,6 +53,61 @@ pub fn toggle(ui: &mut Ui, p: &Palette, on: &mut bool, size: f32, label: &str) -
         }
     }
     response
+}
+
+/// A switch with a title and a short explanation beside it. Returns true when it was flipped.
+pub fn toggle_row(ui: &mut Ui, p: &Palette, on: &mut bool, title: &str, subtitle: &str, tooltip: &str) -> bool {
+    ui.horizontal(|ui| {
+        let response = toggle(ui, p, on, 18.0, title);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 1.0;
+            ui.label(RichText::new(title).color(p.text));
+            ui.add(egui::Label::new(RichText::new(subtitle).color(p.text_dim).text_style(TextStyle::Small)).wrap());
+        });
+        let response = if tooltip.is_empty() { response } else { response.on_hover_text(tooltip) };
+        response.changed()
+    })
+    .inner
+}
+
+/// A small "x" button drawn in `rect` (remove a source or an app from a list). It is only
+/// painted while `visible` (the row is hovered or selected) or focused, but always clickable.
+pub fn close_x(ui: &mut Ui, p: &Palette, rect: egui::Rect, id: egui::Id, visible: bool, label: &str) -> Response {
+    let response = ui.interact(rect, id, Sense::click());
+    response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    if (visible || response.hovered() || response.has_focus()) && ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        if response.hovered() || response.has_focus() {
+            painter.circle_filled(rect.center(), rect.width() / 2.0, p.text.gamma_multiply(0.10));
+        }
+        let color = if response.hovered() { p.text } else { p.text_dim };
+        let d = rect.width() * 0.18;
+        let c = rect.center();
+        for (a, b) in [(vec2(-d, -d), vec2(d, d)), (vec2(-d, d), vec2(d, -d))] {
+            painter.line_segment([c + a, c + b], Stroke::new(1.4, color));
+        }
+        if response.has_focus() {
+            painter.circle_stroke(c, rect.width() / 2.0, Stroke::new(1.5, p.accent));
+        }
+    }
+    response
+}
+
+/// A rounded tag with an "x" to remove it. Returns true when the "x" was clicked.
+pub fn chip(ui: &mut Ui, p: &Palette, text: &str, tooltip: &str) -> bool {
+    let font = FontId::proportional(12.5);
+    let max_text = (ui.available_width() - 40.0).max(40.0);
+    let galley = truncated(ui, text, font, p.text, max_text);
+    let size = vec2(galley.size().x + 36.0, 26.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+    let response = response.on_hover_text(tooltip);
+    if ui.is_rect_visible(rect) {
+        let painter = ui.painter();
+        painter.rect(rect, CornerRadius::same(13), p.surface_hi, Stroke::new(1.0, p.border), StrokeKind::Inside);
+        painter.galley(pos2(rect.left() + 11.0, rect.center().y - galley.size().y / 2.0), galley, p.text);
+    }
+    let x = egui::Rect::from_center_size(pos2(rect.right() - 13.0, rect.center().y), Vec2::splat(18.0));
+    close_x(ui, p, x, response.id.with("remove"), true, &format!("Remove {text}")).clicked()
 }
 
 /// A rounded status label with a coloured dot.
@@ -166,7 +226,8 @@ pub fn card(
 }
 
 /// A row of joined buttons (a segmented control). Returns the index clicked this frame.
-pub fn segmented(ui: &mut Ui, p: &Palette, labels: &[&str], selected: Option<usize>) -> Option<usize> {
+/// `id_salt` tells several of them in one panel apart.
+pub fn segmented(ui: &mut Ui, p: &Palette, id_salt: &str, labels: &[&str], selected: Option<usize>) -> Option<usize> {
     let height = 28.0;
     let width = ui.available_width();
     let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
@@ -185,7 +246,7 @@ pub fn segmented(ui: &mut Ui, p: &Palette, labels: &[&str], selected: Option<usi
         let seg_w = text_w[i] * scale + spare;
         let seg = egui::Rect::from_min_size(pos2(x, rect.top()), vec2(seg_w, height));
         x += seg_w;
-        let id = ui.id().with(("segment", i));
+        let id = ui.id().with(("segment", id_salt, i));
         let response = ui.interact(seg, id, Sense::click());
         response.widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, selected == Some(i), *label));
         let is_selected = selected == Some(i);

@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    # Pushing a version tag (v0.1.0) also publishes a GitHub release from this run's builds.
+    # Pushing a version tag (e.g. v0.2.0) also publishes a GitHub release from this run's builds.
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -64,7 +64,10 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --target ${{ matrix.target }} -- -D warnings
       # Unit and integration tests only: none needs audio hardware or a display. The Windows live
       # tests are examples (win_e2e, win_tone, ...), which `cargo test` builds but never runs.
+      # Many tests drive threads and timers; a hung one fails here instead of holding the runner
+      # for the 6-hour default. The tests themselves take a few minutes at most.
       - name: Test
+        timeout-minutes: 30
         run: cargo test --locked --workspace --target ${{ matrix.target }}
       - name: Build release
         run: cargo build --locked --release --target ${{ matrix.target }}
