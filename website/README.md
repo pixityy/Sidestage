@@ -22,11 +22,11 @@ python website/serve.py
 Then open <http://127.0.0.1:8770/>. The script serves `website/` at `/` and `docs/media/` at
 `/media/`, the same layout the deploy workflow builds.
 
-## When the multi-source update ships
+## Next update or released
 
-In `index.html`, change `<html lang="en" data-update="next">` to `data-update="out"`. That swaps
-every "coming next" tag and sentence for its released wording. The production stills already show
-the update (demo-mode screenshots from `docs/media/`).
+`<html lang="en" data-update="...">` in `index.html` picks between two wordings: `next` shows the
+multi-source update as coming, `out` (the setting since 0.2.0) as released. Elements with the
+classes `if-next` and `if-out` hold the two versions of a sentence or tag.
 
 ## How it is published
 

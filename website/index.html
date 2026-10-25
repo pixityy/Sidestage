@@ -1,7 +1,7 @@
 <!doctype html>
-<!-- data-update: "next" while the multi-source update is still being built, "out" once it ships
-     (switches the "coming next" tags and wording; see website/README.md). -->
-<html lang="en" data-update="next">
+<!-- data-update: "out" since 0.2.0 shipped the multi-source update ("next" shows it as coming;
+     the .if-next / .if-out wording switches with it, see website/README.md). -->
+<html lang="en" data-update="out">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -319,7 +319,7 @@
         <div class="cue-body">
           <p class="label"><span class="tag-new"><span class="if-next">New · coming next</span><span class="if-out">New</span></span></p>
           <h3>Up to 8 sources at once, and voices at your side.</h3>
-          <p>Each source gets its own position, colour and preset. Voice-chat presets tuned for Discord come with a clarity boost and a leveler: a friend who is 12 dB louder or quieter comes out within about 4 dB. Voice chat is never ducked for the game, your other sources can turn down while it talks, and a "Never duck for these apps" list keeps sounds like a video in your browser from turning your sources down.</p>
+          <p>Each source gets its own spot, colour, preset, volume and ducking. Voice presets tuned for Discord come with Clarity and a Leveler that evens out loud and quiet friends: a talker 12 dB quieter comes out within about 4 dB. Voice chat is never turned down for the game; your music and podcasts turn down while someone talks instead. A "Never duck for these apps" list keeps sounds like a video in your browser from turning your sources down, and a limiter keeps several loud sources from clipping.</p>
         </div>
         <div class="cue-vis" aria-hidden="true">
           <div class="next-vis">
@@ -345,7 +345,7 @@
     <div class="sec-head">
       <p class="label"><span class="n">03</span> · On real hardware</p>
       <h2 class="kin" id="proof-title">Spotify behind you. Valorant exactly as it was.</h2>
-      <p class="reveal">Version 0.1 was tested on Windows 11 with Spotify spatialized while playing Valorant. Both of these show the real app, not a mock-up.</p>
+      <p class="reveal">Version 0.1 was tested on Windows 11 with Spotify spatialized while playing Valorant<span class="if-out">, and 0.2's multi-source engine passed its live tests on real hardware with test tones</span>. Both of these show the real app, not a mock-up.</p>
     </div>
     <div class="proof-grid">
       <figure class="shot reveal">
@@ -359,6 +359,7 @@
         </figure>
         <ul class="facts">
           <li><span><b>Windows 11:</b> tested on real hardware.</span></li>
+          <li class="x if-out"><span><b>Several real apps at once:</b> the engine passed its live tests with test tones, but several real apps together haven't been tried yet.</span></li>
           <li class="x"><span><b>macOS 14.2+ and Linux:</b> build and pass CI, not yet tried on real machines.</span></li>
         </ul>
       </div>
@@ -370,7 +371,7 @@
           <p class="label"><span class="tag-new"><span class="if-next">Coming next</span><span class="if-out">New</span></span>Production stills</p>
           <h3>Three sources, voice presets, a never-duck list.</h3>
         </div>
-        <p>The multi-source update in demo mode, with simulated apps: Spotify behind you, Pocket Casts on your left, Discord on your right.</p>
+        <p>In demo mode, with simulated apps: Spotify behind you, Pocket Casts on your left, Discord on your right.</p>
       </div>
       <ul class="stills-grid">
         <li class="still s-lead reveal">
@@ -416,14 +417,15 @@
     <div class="sec-head center">
       <p class="label"><span class="n">04</span> · Download</p>
       <h2 class="kin" id="download-title">Free forever. Bring headphones.</h2>
-      <p class="reveal">No price, no account, no telemetry. Pick your system; every button goes to the latest release on GitHub.</p>
+      <p class="reveal">No price, no account, no telemetry. Pick your system; every button goes to the latest release on GitHub.<span class="if-out"> Upgrading from 0.1 keeps your settings: they become your first source.</span></p>
     </div>
     <div class="platforms">
       <article class="plat reveal" data-os="win">
         <span class="mine-tag">Your system</span>
         <div class="plat-top"><h3>Windows</h3><span class="status ok"><i aria-hidden="true"></i>Tested</span></div>
         <p class="plat-req">Windows 11 · Windows 10 2004+ may work</p>
-        <p>Tested on real hardware, with Spotify spatialized while playing Valorant. Unzip and run <code>sidestage.exe</code>.</p>
+        <p class="if-next">Tested on real hardware, with Spotify spatialized while playing Valorant. Unzip and run <code>sidestage.exe</code>.</p>
+        <p class="if-out">Tested on real hardware: 0.1 with Spotify while playing Valorant, and 0.2's multi-source engine with live test tones. Unzip and run <code>sidestage.exe</code>.</p>
         <p class="fine">Not code-signed yet, so SmartScreen warns you the first time: choose More info, then Run anyway.</p>
         <a class="btn btn-primary" href="https://github.com/pixityy/Sidestage/releases/latest">Download for Windows</a>
       </article>
@@ -475,8 +477,8 @@
         <p>Never. It captures only the apps you choose. The game's audio is not captured, routed or processed, so its footsteps and gunshots keep their exact position and timing.</p>
       </details>
       <details>
-        <summary>Why does the Windows Volume mixer show my music app at 0?</summary>
-        <p>That is how the original is hidden on Windows: the app is turned down to -120 dB and the captured copy is boosted back by the same amount. Use Sidestage's own volume slider instead. If Sidestage is killed, a helper process puts the app's volume back right away.</p>
+        <summary>Why does the Windows Volume mixer show my apps at 0?</summary>
+        <p>That is how the originals are hidden on Windows: each source's app is turned down to -120 dB and its captured copy is boosted back by the same amount. Use Sidestage's own volume sliders instead. If Sidestage is killed, a helper process puts the volumes back right away.</p>
       </details>
       <details>
         <summary>The music sounds in front of me, not behind.</summary>
