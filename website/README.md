@@ -5,12 +5,11 @@ has no build step, no tracking, no cookies and no third-party requests.
 
 | Path | What |
 |---|---|
-| `index.html` | The page, in five acts: the stage (hero), the cast, the sound check, the programme, the box office |
+| `index.html` | The page: hero, sound check, the cue sheet of features, proof (screenshot, demo video, stills), downloads, questions |
 | `css/site.css` | All styles. Colours are the app's dark palette from `crates/sidestage/src/ui/theme.rs` |
-| `js/stage.js` | Radar geometry and SVG, the same as the app's `radar.rs` (log rings, GAME wedge, head) |
-| `js/hero.js` | The hero's load sequence and ducking loop, and the six preset plans |
-| `js/listen.js`, `js/audio.js` | The sound check: the draggable radar, and its sound made with Web Audio (HRTF panners) |
-| `fonts/` | Bodoni Moda, Hanken Grotesk and Fragment Mono (latin subsets) with their OFL licences |
+| `js/site.js` | The radar (the same geometry as the app's `radar.rs`), the hero's entrance and idle motion, the sound check's radar and controls, reveals and the download highlight |
+| `js/audio.js` | The sound check's sound, made with Web Audio: a music loop and a voice through HRTF panners, game footsteps played straight |
+| `fonts/` | Bricolage Grotesque, Onest and Martian Mono (latin subsets) with their OFL licences |
 | `404.html`, `favicon.svg`, `CNAME` | Pages extras |
 | `serve.py` | Local preview server; not published |
 
@@ -28,9 +27,9 @@ Then open <http://127.0.0.1:8770/>. The script serves `website/` at `/` and `doc
 1. In `index.html`, change `<html lang="en" data-update="next">` to `data-update="out"`. That swaps
    every "Next update" badge and sentence for its released wording.
 2. Put the new screenshots in `docs/media/` and point the three frames under "Production stills"
-   (`<li class="shot" data-slot="...">`) at them. In each one, replace the `img` `src`, `alt`,
+   (`<li class="still" data-slot="...">`) at them. In each one, replace the `img` `src`, `alt`,
    `width` and `height`, delete the `<span class="standin">`, rewrite the `figcaption`, and add the
-   class `final` to the `li`. Delete the `.stills-head` paragraph about stand-ins.
+   class `final` to the `li`.
 
 ## How it is published
 

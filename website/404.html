@@ -1,31 +1,32 @@
 <!doctype html>
-<html lang="en" data-update="next">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Not on the programme · Sidestage</title>
+<title>Not here · Sidestage</title>
 <meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0F1015">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/css/site.css">
 <style>
-  .lost{min-height:100vh;display:grid;place-items:center;text-align:center;padding:40px var(--gutter);
-    background:radial-gradient(50% 45% at 50% 30%,color-mix(in srgb,var(--spot) 9%,transparent),transparent 70%),var(--stage)}
-  .lost .act-num{display:block;margin-bottom:18px}
-  .lost h1{font-size:clamp(2.4rem,1.4rem + 4vw,4.4rem)}
-  .lost h1 em{font-weight:500;color:var(--accent-hi)}
-  .lost p{margin:18px auto 30px;max-width:40ch;color:var(--text-dim)}
-  .lost .ctas{justify-content:center}
+  .lost{min-height:100vh;min-height:100svh;display:grid;place-items:center;text-align:center;padding:48px var(--gutter)}
+  .lost h1{font-size:clamp(2.5rem, 4vw + 1rem, 4.5rem);line-height:1;margin:18px 0 18px}
+  .lost h1 span{color:var(--accent-hi)}
+  .lost p:not(.label){margin:0 auto 32px;max-width:32em;color:var(--text-dim)}
+  .lost .cta{justify-content:center}
 </style>
 </head>
 <body>
+<div class="atmos" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
 <main class="lost">
   <div>
-    <span class="act-num" aria-hidden="true">404</span>
-    <h1>Not on <em>the programme.</em></h1>
-    <p>This page wandered off into the wings. The show is still on the main stage.</p>
-    <div class="ctas">
-      <a class="btn btn-primary" href="/">Back to the stage</a>
+    <p class="label"><span class="n">404</span> · Off the radar</p>
+    <h1 class="display">This page is <span>in the wings.</span></h1>
+    <p>There's nothing at this address. The rest of Sidestage is right where you left it.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="/">Back to the start</a>
       <a class="btn btn-ghost" href="https://github.com/pixityy/Sidestage/releases/latest">Download Sidestage</a>
     </div>
   </div>

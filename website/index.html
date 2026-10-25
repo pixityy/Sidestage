@@ -1,572 +1,516 @@
 <!doctype html>
 <!-- data-update: "next" while the multi-source update is still being built, "out" once it ships
-     (switches the "next update" badges and wording; see website/README.md). -->
+     (switches the "coming next" tags and wording; see website/README.md). -->
 <html lang="en" data-update="next">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sidestage · Centre stage for the game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sidestage · Your game centre stage, everything else in the wings</title>
 <meta name="description" content="Sidestage is a free, open-source app that plays your music, podcasts and voice chat in 3D around your head on headphones, while your game's audio stays exactly as it is.">
-<meta name="theme-color" content="#0F1015">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0F1015">
 <link rel="canonical" href="https://sidestage.it.com/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://sidestage.it.com/">
-<meta property="og:title" content="Sidestage · Centre stage for the game">
+<meta property="og:title" content="Sidestage · Your game centre stage, everything else in the wings">
 <meta property="og:description" content="Your music moves behind you. Your game audio stays exactly as it is. Free and open source.">
 <meta property="og:image" content="https://sidestage.it.com/media/demo-poster.jpg">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="800">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preload" href="fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/hanken-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
-<script>if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.classList.add('anim');</script>
+<script>if ('IntersectionObserver' in window) document.documentElement.classList.add('js');</script>
 <script type="module" src="js/site.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
+<div class="atmos" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
 
-<!-- Sprite: the app icon, glyphs and shared gradients. -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <defs>
-    <linearGradient id="ic-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="st-icon-top"/><stop offset="1" class="st-icon-bot"/></linearGradient>
-    <clipPath id="ic-clip"><rect x=".64" y=".64" width="62.72" height="62.72" rx="6.4"/></clipPath>
-    <radialGradient id="floorG" cx="50%" cy="50%" r="50%"><stop offset="0" class="st-floor0"/><stop offset="1" class="st-floor1"/></radialGradient>
-    <radialGradient id="poolG" cx="50%" cy="50%" r="50%"><stop offset="0" class="st-pool0"/><stop offset=".55" class="st-pool1"/><stop offset="1" class="st-pool2"/></radialGradient>
-    <radialGradient id="glow-music" cx="50%" cy="50%" r="50%"><stop offset="0" class="g-music g0"/><stop offset=".5" class="g-music g1"/><stop offset="1" class="g-music g2"/></radialGradient>
-    <radialGradient id="glow-podcast" cx="50%" cy="50%" r="50%"><stop offset="0" class="g-podcast g0"/><stop offset=".5" class="g-podcast g1"/><stop offset="1" class="g-podcast g2"/></radialGradient>
-    <radialGradient id="glow-voice" cx="50%" cy="50%" r="50%"><stop offset="0" class="g-voice g0"/><stop offset=".5" class="g-voice g1"/><stop offset="1" class="g-voice g2"/></radialGradient>
-  </defs>
-  <!-- The app icon (crates/sidestage/src/ui/theme.rs): violet tile, faint rings, white head with nose, warm stage-light puck behind. -->
-  <symbol id="icon" viewBox="0 0 64 64">
-    <rect x=".64" y=".64" width="62.72" height="62.72" rx="6.4" fill="url(#ic-grad)"/>
-    <g clip-path="url(#ic-clip)">
-      <circle class="ic-ring" cx="32" cy="28.16" r="16.64"/>
-      <circle class="ic-ring r2" cx="32" cy="28.16" r="24.96"/>
-    </g>
-    <path class="ic-white" d="M29.3 22.4 32 17.4 34.7 22.4Z"/>
-    <circle class="ic-white" cx="32" cy="28.16" r="7.04"/>
-    <circle class="ic-puck" cx="32" cy="51.84" r="4.8"/>
-  </symbol>
-  <symbol id="gh" viewBox="0 0 16 16"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
-  <symbol id="dl" viewBox="0 0 20 20"><path d="M10 3v10m0 0-4.5-4.5M10 13l4.5-4.5M4 16.5h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="hp" viewBox="0 0 24 24"><path d="M4 14.5V12a8 8 0 0 1 16 0v2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><rect x="3" y="13.5" width="4.6" height="7.2" rx="1.7" fill="currentColor"/><rect x="16.4" y="13.5" width="4.6" height="7.2" rx="1.7" fill="currentColor"/></symbol>
-  <symbol id="play" viewBox="0 0 20 20"><path d="M6 3.8v12.4a.8.8 0 0 0 1.2.7l10-6.2a.8.8 0 0 0 0-1.4l-10-6.2a.8.8 0 0 0-1.2.7z" fill="currentColor"/></symbol>
-  <symbol id="stop" viewBox="0 0 20 20"><rect x="4.5" y="4.5" width="11" height="11" rx="2" fill="currentColor"/></symbol>
-</svg>
-
-<!-- Slim bar that slides in once the hero is out of view. -->
-<div class="bar" id="bar" inert>
-  <div class="wrap bar-in">
-    <a class="brand" href="#top" aria-label="Sidestage, back to top"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#icon"/></svg><span>Sidestage</span></a>
-    <nav class="bar-links" aria-label="Sections">
-      <a href="#cast">The cast</a>
-      <a href="#soundcheck-act">Sound check</a>
-      <a href="#programme">Programme</a>
-      <a href="#box-office">Box office</a>
-    </nav>
-    <div class="nav-r">
-      <a class="pill gh" href="https://github.com/pixityy/Sidestage"><svg aria-hidden="true"><use href="#gh"/></svg><span>GitHub</span></a>
-      <a class="pill dl" href="https://github.com/pixityy/Sidestage/releases/latest"><svg aria-hidden="true"><use href="#dl"/></svg>Download</a>
-    </div>
-  </div>
-</div>
-
-<header class="hero" id="top">
-  <div class="house" aria-hidden="true"></div>
-  <div class="wrap">
-    <nav class="nav" aria-label="Main">
-      <a class="brand" href="#top" aria-label="Sidestage, back to top">
-        <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#icon"/></svg>
-        <span>Sidestage</span>
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top" aria-label="Sidestage, back to top">
+      <svg viewBox="-1 -1 2 2" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="ig-nav" x1="0" y1="-1" x2="0" y2="1" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--icon-top)"/><stop offset="1" style="stop-color:var(--icon-bottom)"/></linearGradient>
+        </defs>
+        <rect x="-.98" y="-.98" width="1.96" height="1.96" rx=".2" fill="url(#ig-nav)"/>
+        <g fill="none" style="stroke:var(--on-accent)"><circle cy="-.12" r=".52" stroke-width=".05" stroke-opacity=".35"/><circle cy="-.12" r=".78" stroke-width=".04" stroke-opacity=".21"/></g>
+        <circle cy=".62" r=".15" style="fill:var(--light)"/>
+        <path d="M-.08-.3L0-.44L.08-.3Z" style="fill:var(--on-accent)"/>
+        <circle cy="-.12" r=".22" style="fill:var(--on-accent)"/>
+      </svg>
+      <span>Sidestage</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nl" href="#hear">Hear it</a>
+      <a class="nl" href="#features">Features</a>
+      <a class="nl" href="#download">Download</a>
+      <a class="nav-gh" href="https://github.com/pixityy/Sidestage">
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
       </a>
-      <div class="nav-r">
-        <a class="pill dl" href="https://github.com/pixityy/Sidestage/releases/latest"><svg aria-hidden="true"><use href="#dl"/></svg>Download</a>
-        <a class="pill" href="https://github.com/pixityy/Sidestage"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a>
-      </div>
+      <a class="nl-dl" href="#download">Download</a>
     </nav>
-
-    <div class="hero-grid">
-      <div class="hero-head">
-        <p class="eyebrow rv" style="--d:150ms"><span class="eb-act">Act I</span><span class="rule" aria-hidden="true"></span><span>3D audio for everything but your game</span></p>
-        <h1 class="rv" style="--d:280ms"><span class="ln lit">Centre stage</span><span class="ln">for the game.</span></h1>
-        <p class="deck rv" style="--d:520ms">Your music, a podcast, your Discord: they wait <b>in the wings</b>, behind you and at your sides.</p>
-      </div>
-
-      <figure class="stage" aria-labelledby="stage-cap">
-        <div class="radar-box">
-          <div class="beam" aria-hidden="true"><div class="cone"></div><div class="cone core"></div></div>
-          <div class="motes" aria-hidden="true"></div>
-          <div id="hero-radar"></div>
-          <noscript><img src="media/screenshot-main.png" width="1500" height="990" alt="The Sidestage window with the radar: Spotify placed behind the listener's head, the game wedge in front."></noscript>
-          <p class="cue" aria-hidden="true"><i></i><span id="cue-text">The game is live · untouched</span></p>
-        </div>
-        <figcaption id="stage-cap">Fig. 1 · The stage plan, seen from above. <span class="k-blue">Blue</span>: your game, never touched. <span class="k-violet">Colours</span>: the apps Sidestage moves. <span class="if-next">Several sources at once arrives in the next update; 0.1 stages one app at a time.</span><span class="if-out">Several sources at once, each with its own place and preset.</span></figcaption>
-      </figure>
-
-      <div class="hero-body">
-        <p class="lede rv" style="--d:680ms">Sidestage plays <span class="if-next">the app</span><span class="if-out">the apps</span> you pick in 3D around your head, on headphones. <strong>Your game's audio is never captured or processed</strong>, so footsteps and gunshots keep their exact position and timing.</p>
-        <div class="ticket rv" style="--d:820ms" role="group" aria-label="Free forever. Open source, MIT or Apache 2.0.">
-          <div class="t-main">
-            <span class="t-label">Admission</span>
-            <strong class="t-free">Free forever</strong>
-            <span class="t-lic">Open source · <span class="nw">MIT OR Apache-2.0</span></span>
-          </div>
-          <div class="t-stub" aria-hidden="true"><span>Admit</span><b>All</b><span>No account</span></div>
-        </div>
-        <div class="ctas rv" style="--d:940ms">
-          <a class="btn btn-primary" href="https://github.com/pixityy/Sidestage/releases/latest"><svg aria-hidden="true"><use href="#dl"/></svg>Download Sidestage <small>free</small></a>
-          <a class="btn btn-ghost" href="https://github.com/pixityy/Sidestage"><svg aria-hidden="true"><use href="#gh"/></svg>View on GitHub</a>
-        </div>
-        <ul class="fine rv" style="--d:1060ms">
-          <li><span class="dot ok" aria-hidden="true"></span>Windows 11 · tested</li>
-          <li><span class="dot exp" aria-hidden="true"></span>macOS · Linux · experimental</li>
-          <li><svg aria-hidden="true"><use href="#hp"/></svg>Headphones only</li>
-        </ul>
-      </div>
-    </div>
   </div>
-
-  <nav class="running wrap" aria-label="Running order">
-    <ol>
-      <li><a href="#top"><span class="n">Act I</span><span class="t">The stage</span></a></li>
-      <li><a href="#cast"><span class="n">Act II</span><span class="t">The cast</span></a></li>
-      <li><a href="#soundcheck-act"><span class="n">Act III</span><span class="t">Sound check</span></a></li>
-      <li><a href="#programme"><span class="n">Act IV</span><span class="t">The programme</span></a></li>
-      <li><a href="#box-office"><span class="n">Act V</span><span class="t">Box office</span></a></li>
-    </ol>
-  </nav>
 </header>
 
+<div class="page">
 <main id="main">
-  <!-- ===== ACT II · THE CAST ===== -->
-  <section class="act cast-act" id="cast" aria-labelledby="cast-h">
-    <div class="wrap">
-      <div class="act-mark">
-        <span class="act-num" aria-hidden="true">II</span>
-        <p class="act-lbl">Act two<b>The cast</b></p>
-        <p class="act-lbl r">Billed<b>in order of importance</b></p>
-      </div>
-      <div class="act-intro">
-        <h2 id="cast-h">Nobody upstages <em>the game.</em></h2>
-        <p>Sidestage only touches the apps you hand it. <strong>Your game's audio is never captured and never processed</strong>, so it reaches your headphones exactly as the game made it. Everything else is re-staged around your head.</p>
-      </div>
 
-      <div class="bill">
-        <div class="bill-cols" aria-hidden="true"><span>Source</span><span>How it reaches your ears</span><span>Where you hear it</span></div>
-        <ol class="cast">
-          <li class="role role-game">
-            <h3 class="role-name"><small>The star</small>Your game</h3>
-            <div class="route route-direct" aria-hidden="true"><span class="wire"></span><span class="note">Never captured · never processed</span><span class="tip"></span></div>
-            <p class="role-mark">Centre stage<span>exactly as the game made it</span></p>
-            <p class="role-desc">Valorant, Counter-Strike 2, whatever you are playing. It never passes through Sidestage, so every footstep and gunshot keeps its exact position and timing.</p>
-            <span class="badge b-info">Untouched</span>
-          </li>
-          <li class="role" style="--src:var(--c-music)">
-            <h3 class="role-name"><small>Your music</small>Spotify</h3>
-            <div class="route route-moved" aria-hidden="true"><span class="wire"></span><span class="node"></span><span class="note"><b>Sidestage</b> · placed in 3D · original hidden</span><span class="tip"></span></div>
-            <p class="role-mark">Behind you<span>1.5 m · 60° wide</span></p>
-            <p class="role-desc">Captured, placed in 3D on your headphones, with the original hidden so you never hear it twice. It steps back while the game is loud.</p>
-            <span class="badge b-accent">Moved · since 0.1</span>
-          </li>
-          <li class="role next" style="--src:var(--c-podcast)">
-            <h3 class="role-name"><small>A podcast</small>Podcast</h3>
-            <div class="route route-moved" aria-hidden="true"><span class="wire"></span><span class="node"></span><span class="note"><b>Sidestage</b> · placed in 3D</span><span class="tip"></span></div>
-            <p class="role-mark">Your left<span>Podcast left preset</span></p>
-            <p class="role-desc">A voice at your shoulder with its own position and preset, well clear of the game in front of you.</p>
-            <span class="badge b-next"><span class="if-next">Next update</span><span class="if-out">New</span></span>
-          </li>
-          <li class="role next" style="--src:var(--c-voice)">
-            <h3 class="role-name"><small>Voice chat</small>Discord</h3>
-            <div class="route route-moved" aria-hidden="true"><span class="wire"></span><span class="node"></span><span class="note"><b>Sidestage</b> · leveled · clarified</span><span class="tip"></span></div>
-            <p class="role-mark">Your right<span>Voice chat right preset</span></p>
-            <p class="role-desc">Voice-chat presets tuned for Discord, with a leveler and a clarity boost. Voice is never ducked for the game, and your music can turn down while someone talks.</p>
-            <span class="badge b-next"><span class="if-next">Next update</span><span class="if-out">New</span></span>
-          </li>
-        </ol>
-        <p class="cast-foot if-next">Version 0.1 stages one app at a time. Several sources at once, each with its own position and preset, arrives in the next update.</p>
+<!-- ================================================================== HERO -->
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <div class="hero-glow hg-a" data-speed=".1" aria-hidden="true"></div>
+  <div class="hero-glow hg-b" data-speed=".32" aria-hidden="true"></div>
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <div class="badges rise" style="--d:0ms">
+        <span class="badge-free"><i aria-hidden="true"></i>Free forever</span>
+        <span class="badge-oss">Open source · <b>MIT OR Apache-2.0</b></span>
       </div>
-
-      <blockquote class="quote">
-        <p><span>Your music moves behind you.</span> Your game audio stays exactly as it is.</p>
-        <footer>The whole idea, from the README</footer>
-      </blockquote>
+      <h1 class="display" id="hero-title">
+        <span class="line"><span class="w" style="--i:0">Your</span> <span class="w" style="--i:1">game,</span></span>
+        <span class="line l-game"><span class="w" style="--i:2">centre</span> <span class="w" style="--i:3">stage.</span></span>
+        <span class="line"><span class="w" style="--i:4">Everything</span> <span class="w" style="--i:5">else</span></span>
+        <span class="line l-wings"><span class="w" style="--i:6">in</span> <span class="w" style="--i:7">the</span> <span class="w wings" style="--i:8">wings.</span></span>
+      </h1>
+      <p class="lede rise" style="--d:640ms">Sidestage plays the apps you choose, like Spotify, a podcast or Discord, in 3D around your head on headphones. Your game's audio is <strong>never captured or processed</strong>, so footsteps and gunshots keep their exact position and timing.</p>
+      <div class="cta rise" style="--d:780ms">
+        <a class="btn btn-primary" href="https://github.com/pixityy/Sidestage/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+          <span>Download</span><span class="btn-sub">Free · open source</span>
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/pixityy/Sidestage">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span>Source on GitHub</span>
+        </a>
+      </div>
+      <p class="hero-meta rise" style="--d:920ms">
+        <span><i class="m-ok" aria-hidden="true"></i>Windows 11 · tested</span>
+        <span><i class="m-exp" aria-hidden="true"></i>macOS &amp; Linux · experimental</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0116 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.6"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6"/></svg>Headphones required</span>
+      </p>
     </div>
-  </section>
 
-  <!-- ===== ACT III · SOUND CHECK ===== -->
-  <section class="act sc-act" id="soundcheck-act" aria-labelledby="sc-h">
-    <div class="wrap">
-      <div class="act-mark">
-        <span class="act-num" aria-hidden="true">III</span>
-        <p class="act-lbl">Act three<b>Sound check</b></p>
-        <p class="act-lbl r">Headphones<b>required</b></p>
+    <div class="hero-visual">
+      <div class="radar-wrap" id="hero-wrap">
+        <svg class="field" id="hero-field" data-speed=".22" aria-hidden="true" focusable="false"></svg>
+        <svg class="radar" id="hero-radar" role="img" aria-labelledby="hero-radar-t" focusable="false"><title id="hero-radar-t">The Sidestage radar seen from above: Spotify sits behind your head at 1.5 metres, a podcast on your left, Discord on your right, and the shaded game area in front stays untouched.</title></svg>
+        <div class="chip" data-src="music" style="--c:var(--accent)" aria-hidden="true"><i></i><span><b>Spotify</b><em>Behind you · 1.5 m · 60° wide</em></span></div>
+        <div class="chip" data-src="pod" style="--c:var(--light)" aria-hidden="true"><i></i><span><b>Podcast</b><em>Podcast left</em></span></div>
+        <div class="chip" data-src="voice" style="--c:var(--ok)" aria-hidden="true"><i></i><span><b>Discord</b><em>Voice chat right</em></span></div>
+        <noscript><img src="media/screenshot-main.png" width="1500" height="990" alt="The Sidestage app with its radar, Spotify placed behind the listener."></noscript>
       </div>
-      <div class="act-intro">
-        <h2 id="sc-h">Put on headphones. <em>Move the music.</em></h2>
-        <p>Drag the music anywhere around your head. A friend talks on your right while footsteps cross the <strong>game's wedge in front of you, untouched</strong>: they skip the 3D stage entirely, the way your real game skips Sidestage.</p>
+      <div class="stagebar">
+        <span class="sb sb-run"><i aria-hidden="true"></i>Running</span>
+        <span class="sb sb-game"><i aria-hidden="true"></i>Game audio: never captured</span>
+        <span class="sb sb-duck" id="sb-duck"><i aria-hidden="true"></i>Ducking</span>
       </div>
-
-      <div class="sc" id="soundcheck">
-        <div class="sc-stage">
-          <div class="sc-box"><div id="sc-radar"></div></div>
-          <p class="sc-hint">Drag a puck, or click the stage to place the selected one. Ctrl snaps to 15°. With a puck focused, the arrow keys move it, Page Up and Page Down change the height and Home puts it back.</p>
-        </div>
-
-        <div class="sc-desk">
-          <div class="sc-status" aria-live="polite">
-            <span class="spill s-run" id="sc-run">Stopped</span>
-            <span class="spill s-duck" id="sc-duck">Ducking</span>
-            <span class="spill s-bypass" id="sc-bypass-pill">Bypass</span>
-          </div>
-          <button class="sc-play" id="sc-play" type="button" aria-pressed="false">
-            <span class="sc-play-ic" aria-hidden="true"><svg class="i-play"><use href="#play"/></svg><svg class="i-stop"><use href="#stop"/></svg></span>
-            <span class="sc-play-txt"><span class="sc-play-label">Start the sound check</span><small>Made live in your browser · nothing to download</small></span>
-          </button>
-          <p class="sc-hp"><svg aria-hidden="true"><use href="#hp"/></svg><span><b>Headphones on.</b> The effect is binaural and does not work on speakers.</span></p>
-          <p class="sc-unsupported" id="sc-unsupported" hidden>This browser can't play Web Audio, so the sound check stays silent here. The radar still moves.</p>
-
-          <div class="sc-read">
-            <span class="label" id="sc-who">Music</span>
-            <strong id="sc-pos">Behind you · 1.5 m</strong>
-            <span id="sc-sub">60° wide · height 0°</span>
-          </div>
-
-          <fieldset class="sc-group">
-            <legend class="label">Music presets</legend>
-            <div class="sc-presets">
-              <button type="button" data-preset="behind" aria-pressed="true">Behind you</button>
-              <button type="button" data-preset="next" aria-pressed="false">Next room</button>
-              <button type="button" data-preset="far" aria-pressed="false">Far away</button>
-              <button type="button" data-preset="above" aria-pressed="false">Above</button>
-              <button type="button" data-preset="desk" aria-pressed="false">Desk speaker</button>
-              <button type="button" data-preset="lounge" aria-pressed="false">Lounge</button>
-            </div>
-          </fieldset>
-
-          <fieldset class="sc-group">
-            <legend class="label">On stage</legend>
-            <label class="sw" style="--src:var(--c-music)"><input type="checkbox" data-layer="music" checked><span class="track" aria-hidden="true"></span><span class="sw-t">Music<small>a lo-fi loop, placed in 3D</small></span></label>
-            <label class="sw" style="--src:var(--c-voice)"><input type="checkbox" data-layer="voice" checked><span class="track" aria-hidden="true"></span><span class="sw-t">Voice chat<small>a murmuring friend, never ducked</small></span></label>
-            <label class="sw" style="--src:var(--info)"><input type="checkbox" data-layer="game" checked><span class="track" aria-hidden="true"></span><span class="sw-t">Game<small>footsteps and shots, untouched</small></span></label>
-          </fieldset>
-
-          <div class="sc-row">
-            <label class="sw"><input type="checkbox" id="sc-footstep"><span class="track" aria-hidden="true"></span><span class="sw-t">Footstep-safe<small>keeps 2–5 kHz clear</small></span></label>
-            <button class="sc-bypass" id="sc-bypass" type="button" aria-pressed="false">Hold to bypass <kbd>B</kbd></button>
-          </div>
-
-          <p class="sc-note">Everything here is synthesized on this page and placed with your browser's generic HRTF. It is a taste of the idea, not Sidestage's own renderer, which uses a spherical-head model and real rooms and runs on your PC.</p>
-        </div>
-      </div>
-
-      <div class="rec">
-        <div class="rec-head">
-          <p class="scene-no">The recording</p>
-          <h3>The real thing, <em>on Windows 11.</em></h3>
-          <p>Spotify moving around the listener while Valorant plays exactly as it should. Recorded with the app, blurred for privacy. Turn the sound on and wear headphones.</p>
-        </div>
-        <figure class="rec-frame">
-          <video controls playsinline preload="none" poster="media/demo-poster.jpg" width="1280" height="800" aria-describedby="rec-cap">
-            <source src="media/sidestage-demo.mp4" type="video/mp4">
-            <a href="media/sidestage-demo.mp4">Download the demo video (MP4, 9.4 MB)</a>
-          </video>
-          <figcaption id="rec-cap"><b>Archive footage</b> · Sidestage 0.1 over Valorant · the game's own audio is never touched</figcaption>
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== ACT IV · THE PROGRAMME ===== -->
-  <section class="act prog-act" id="programme" aria-labelledby="prog-h">
-    <div class="wrap">
-      <div class="act-mark">
-        <span class="act-num" aria-hidden="true">IV</span>
-        <p class="act-lbl">Act four<b>The programme</b></p>
-        <p class="act-lbl r">Running time<b>as long as you play</b></p>
-      </div>
-      <div class="act-intro">
-        <h2 id="prog-h">Tonight's <em>programme.</em></h2>
-        <p>Scenes i to vi ship in <strong>Sidestage 0.1</strong>, released and free. No account, nothing to sign up for, nothing phoning home.</p>
-      </div>
-
-      <div class="prog-top">
-        <article class="scene">
-          <p class="scene-no">Scene <b>i</b></p>
-          <h3>The radar</h3>
-          <p>A top-down map of your head. Drag the sound anywhere around you. Distance runs on a log scale, so the close range where most placement happens gets plenty of room.</p>
-          <ul class="specs">
-            <li><span>Direction</span><span>drag · Ctrl snaps to 15°</span></li>
-            <li><span>Distance</span><span>0.5 to 20 m · scroll wheel</span></li>
-            <li><span>Height</span><span>Shift-drag · Page Up/Down</span></li>
-            <li><span>Back to the preset</span><span>double-click · Home</span></li>
-            <li><span>Hear it unprocessed</span><span>hold Bypass · B</span></li>
-          </ul>
-        </article>
-        <figure class="still">
-          <img src="media/screenshot-light.png" width="1500" height="990" loading="lazy" decoding="async" alt="The Sidestage window in its light theme. Apps on the left with Spotify selected; the radar in the middle with the music behind the head and the GAME wedge in front; preset cards and sound sliders on the right.">
-          <figcaption><b>Production still</b> · Sidestage 0.1, light theme · Spotify behind you, 1.5 m, 60° wide</figcaption>
-        </figure>
-      </div>
-
-      <div class="rep">
-        <div class="rep-head">
-          <div>
-            <p class="scene-no">Scene <b>ii</b></p>
-            <h3>Six marks to hit</h3>
-          </div>
-          <p>Presets are one-click starting points, and every one keeps the music out of the space in front of you where the game lives. Each plan below is drawn from the preset's real values.</p>
-        </div>
-        <ul class="rep-grid">
-          <li class="rep-item is-default"><div class="rep-svg" data-preset="behind"></div><h4>Behind you<span class="def">Default</span></h4><p>Close behind your head, in a small room.</p><p class="spec">180° · 1.5 m · 60° wide</p></li>
-          <li class="rep-item"><div class="rep-svg" data-preset="next"></div><h4>Next room</h4><p>Muffled, like a party through the wall.</p><p class="spec">150° · 5 m · highs cut above 1.4 kHz</p></li>
-          <li class="rep-item"><div class="rep-svg" data-preset="far"></div><h4>Far away</h4><p>Distant and airy, barely there.</p><p class="spec">180° · 15 m · hall</p></li>
-          <li class="rep-item"><div class="rep-svg" data-preset="above"></div><h4>Above</h4><p>Overhead and slightly behind.</p><p class="spec">180° · 2 m · 60° up</p></li>
-          <li class="rep-item"><div class="rep-svg" data-preset="desk"></div><h4>Desk speaker</h4><p>A little speaker on your desk, front-right.</p><p class="spec">35° · 0.7 m · 20° down</p></li>
-          <li class="rep-item"><div class="rep-svg" data-preset="lounge"></div><h4>Lounge</h4><p>Wide and relaxed behind you. For casual games.</p><p class="spec">180° · 2.5 m · 90° wide · no ducking</p></li>
-        </ul>
-      </div>
-
-      <div class="scenes">
-        <article class="scene">
-          <p class="scene-no">Scene <b>iii</b></p>
-          <h3>Footstep-safe</h3>
-          <p>One switch cuts the music by at least 6 dB around 3.2 kHz, where footsteps live, rolls off the highs, lowers the bass and switches ducking to Competitive. The sound you listen for gets room to cut through.</p>
-          <div class="viz">
-            <svg viewBox="0 0 400 128" role="img" aria-label="Sketch of a spectrum: the music fills the range from bass to treble, with a dip between 2 and 5 kilohertz where footsteps live.">
-              <path class="fs-music" d="M20 104V64C50 46 90 40 130 44S220 46 245 52C256 55 258 82 268 84H300C310 82 312 58 325 54S362 62 380 76V104Z"/>
-              <rect class="fs-band" x="260" y="16" width="47.7" height="88"/>
-              <line class="fs-edge" x1="260" y1="16" x2="260" y2="104"/><line class="fs-edge" x1="307.7" y1="16" x2="307.7" y2="104"/>
-              <path class="fs-ghost" d="M245 52C262 49 292 49 325 54"/>
-              <text class="fs-lbl" x="283.9" y="9">FOOTSTEPS</text>
-              <line class="fs-axis" x1="20" y1="104" x2="380" y2="104"/>
-              <text class="fs-tick" x="103.9" y="122">100 Hz</text>
-              <text class="fs-tick" x="223.9" y="122">1k</text>
-              <text class="fs-tick hot" x="260" y="122">2k</text>
-              <text class="fs-tick hot" x="307.7" y="122">5k</text>
-              <text class="fs-tick" x="350" y="122">10k</text>
-            </svg>
-          </div>
-        </article>
-        <article class="scene">
-          <p class="scene-no">Scene <b>iv</b></p>
-          <h3>Ducking</h3>
-          <p>When the game gets loud, the music steps back, then returns. Sidestage listens to everything except the music to decide. Pick how hard it ducks, from Off to Competitive.</p>
-          <div class="viz">
-            <svg viewBox="0 0 400 128" role="img" aria-label="Sketch: each time the game gets loud, the music level dips, then comes back.">
-              <rect class="dk-zone" x="118" y="20" width="62" height="100"/>
-              <rect class="dk-zone" x="252" y="20" width="48" height="100"/>
-              <g class="dk-bars" id="duck-bars"></g>
-              <path class="dk-line" d="M20 38H112C120 38 122 66 132 66H174C184 66 188 38 198 38H246C254 38 256 62 264 62H296C304 62 308 38 318 38H380"/>
-              <path class="dk-arrow" d="M149 44V56M144.5 51.5 149 56 153.5 51.5"/>
-              <path class="dk-arrow" d="M276 42V52M271.5 47.5 276 52 280.5 47.5"/>
-              <text class="dk-lbl m" x="20" y="28">MUSIC</text>
-              <text class="dk-lbl g" x="20" y="98">GAME</text>
-              <text class="dk-lbl w" x="149" y="14" text-anchor="middle">DUCK</text>
-            </svg>
-          </div>
-          <ul class="modes" aria-label="Ducking strengths">
-            <li>Off</li><li>Gentle</li><li class="on">Standard</li><li>Competitive</li>
-          </ul>
-        </article>
-        <article class="scene">
-          <p class="scene-no">Scene <b>v</b></p>
-          <h3>Heard once, never twice</h3>
-          <p>The app's normal sound is hidden automatically, so you only hear the 3D version. If Sidestage is killed, your audio comes back: a helper process restores it on Windows and Linux, and macOS does it by itself. Every start also checks for anything an earlier run left behind.</p>
-          <ul class="ledger" aria-label="What happens to Spotify's audio">
-            <li><span class="k">Spotify, original</span><span class="fill" aria-hidden="true"></span><span class="v no">hidden</span></li>
-            <li><span class="k">Spotify, in 3D</span><span class="fill" aria-hidden="true"></span><span class="v">playing</span></li>
-            <li><span class="k">After a crash</span><span class="fill" aria-hidden="true"></span><span class="v ok">put back</span></li>
-          </ul>
-          <p class="term"><span class="pr">$</span> sidestage restore <span class="cm"># by hand, if you ever need it</span></p>
-        </article>
-        <article class="scene">
-          <p class="scene-no">Scene <b>vi</b></p>
-          <h3>Nothing leaves your machine</h3>
-          <p>Sidestage has no network code at all. Audio is processed in memory and never recorded. What you listen to stays between you and your headphones.</p>
-          <ul class="ledger" aria-label="Network activity">
-            <li><span class="k">Network code</span><span class="fill" aria-hidden="true"></span><span class="v">none</span></li>
-            <li><span class="k">Telemetry</span><span class="fill" aria-hidden="true"></span><span class="v">none</span></li>
-            <li><span class="k">Accounts</span><span class="fill" aria-hidden="true"></span><span class="v">none</span></li>
-            <li><span class="k">Update checks</span><span class="fill" aria-hidden="true"></span><span class="v">none</span></li>
-            <li><span class="k">This website's cookies</span><span class="fill" aria-hidden="true"></span><span class="v">none</span></li>
-          </ul>
-        </article>
-      </div>
-
-      <div class="rehearsal">
-        <div class="intro">
-          <p class="scene-no"><span class="if-next">In rehearsal</span><span class="if-out">Opening night</span></p>
-          <h3><span class="if-next">Coming <em>next.</em></span><span class="if-out">New in <em>this release.</em></span></h3>
-          <p class="if-next">Being built now and not released yet. This is the update that puts the whole cast on stage at once.</p>
-          <p class="if-out">The update that puts the whole cast on stage at once.</p>
-          <span class="badge b-next"><span class="if-next">Not in 0.1</span><span class="if-out">New</span></span>
-        </div>
-        <ul>
-          <li><b>Several sources at once</b>Music behind you, a podcast on your left, Discord on your right: each app with its own position and preset.</li>
-          <li><b>Voice-chat presets tuned for Discord</b>
-            <span class="tags"><span>Voice chat left</span><span>Voice chat right</span><span>Over your shoulder</span><span>Radio comms</span><span>Podcast left</span></span>
-            With a leveler and a clarity boost.</li>
-          <li><b>Voice comes first</b>Voice is never ducked for the game, and the music can turn down while someone talks.</li>
-          <li><b>A "Never duck for these apps" list</b>The apps on it keep their level, however loud the game gets.</li>
-        </ul>
-      </div>
-
-      <div class="stills">
-        <div class="stills-head">
-          <div>
-            <p class="scene-no">Production stills</p>
-            <h3>From <em>the next update.</em></h3>
-          </div>
-          <p class="if-next">Stills of three sources at once, the voice presets and the never-duck list go in these frames when the update ships. Until then they hold <b>stand-ins from 0.1</b>, marked as such.</p>
-        </div>
-        <ul class="stills-grid">
-          <li class="shot shot-wide" data-slot="sources">
-            <figure>
-              <div class="frame">
-                <img src="media/screenshot-main.png" width="1500" height="990" loading="lazy" decoding="async" alt="Sidestage 0.1 in its dark theme: the app list on the left with Spotify selected, the radar with the music behind the head, and the preset cards on the right.">
-                <span class="standin">0.1 stand-in</span>
-              </div>
-              <figcaption><b>Three sources at once</b><span>Shown for now: 0.1 with one source, Spotify behind you.</span></figcaption>
-            </figure>
-          </li>
-          <li class="shot" data-slot="voice">
-            <figure>
-              <div class="frame">
-                <img src="media/screenshot-ducking.png" width="1500" height="990" loading="lazy" decoding="async" alt="Sidestage 0.1's sound sliders and ducking controls, with the live game level and how far the music is turned down.">
-                <span class="standin">0.1 stand-in</span>
-              </div>
-              <figcaption><b>Voice presets for Discord</b><span>Shown for now: 0.1's sound and ducking controls.</span></figcaption>
-            </figure>
-          </li>
-          <li class="shot" data-slot="never-duck">
-            <figure>
-              <div class="frame">
-                <img src="media/screenshot-diagnostics.png" width="1500" height="990" loading="lazy" decoding="async" alt="Sidestage 0.1's Diagnostics window: latency, dropouts and clock drift.">
-                <span class="standin">0.1 stand-in</span>
-              </div>
-              <figcaption><b>Never duck for these apps</b><span>Shown for now: 0.1's Diagnostics window.</span></figcaption>
-            </figure>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== ACT V · BOX OFFICE ===== -->
-  <section class="act box-act" id="box-office" aria-labelledby="box-h">
-    <div class="wrap">
-      <div class="act-mark">
-        <span class="act-num" aria-hidden="true">V</span>
-        <p class="act-lbl">Act five<b>Box office</b></p>
-        <p class="act-lbl r">Admission<b>free, forever</b></p>
-      </div>
-      <div class="act-intro">
-        <h2 id="box-h">Admission is free. <em>Forever.</em></h2>
-        <p>No account, no trial, no ads, no checkout. Sidestage is open source under <strong>MIT OR Apache-2.0</strong>: download it, read it, fork it. Every ticket below goes to the latest release on GitHub.</p>
-      </div>
-      <ul class="tickets">
-        <li class="tk primary" data-os="windows">
-          <div class="tk-main">
-            <span class="tk-kicker">Platform 01<span class="yours"> · your system</span></span>
-            <h3>Windows</h3>
-            <span class="status s-ok">Tested · Windows 11</span>
-            <p>Run on real hardware: Spotify spatialized while playing Valorant. Unzip and run <code>sidestage.exe</code>. It isn't code-signed yet, so SmartScreen warns you the first time: choose More info, then Run anyway.</p>
-          </div>
-          <div class="tk-stub">
-            <span class="seat">Row A<br>Seat 11</span>
-            <a class="tk-link" href="https://github.com/pixityy/Sidestage/releases/latest"><span class="circ"><svg aria-hidden="true"><use href="#dl"/></svg></span>Download<span class="sr"> Sidestage for Windows</span></a>
-          </div>
-        </li>
-        <li class="tk" data-os="mac">
-          <div class="tk-main">
-            <span class="tk-kicker">Platform 02<span class="yours"> · your system</span></span>
-            <h3>macOS</h3>
-            <span class="status s-exp">Experimental · 14.2+</span>
-            <p>Apple silicon and Intel. Builds and passes its tests in CI, but hasn't run on a real Mac yet. It isn't notarized, so open it once, then allow it in System Settings, Privacy &amp; Security.</p>
-          </div>
-          <div class="tk-stub">
-            <span class="seat">Row B<br>Seat 14</span>
-            <a class="tk-link" href="https://github.com/pixityy/Sidestage/releases/latest"><span class="circ"><svg aria-hidden="true"><use href="#dl"/></svg></span>Download<span class="sr"> Sidestage for macOS (experimental)</span></a>
-          </div>
-        </li>
-        <li class="tk" data-os="linux">
-          <div class="tk-main">
-            <span class="tk-kicker">Platform 03<span class="yours"> · your system</span></span>
-            <h3>Linux</h3>
-            <span class="status s-exp">Experimental</span>
-            <p>x86_64 with PipeWire or PulseAudio. Builds and passes its tests in CI, but hasn't run on a real desktop yet. If you try it, tell us how it went.</p>
-          </div>
-          <div class="tk-stub">
-            <span class="seat">Row C<br>Seat 64</span>
-            <a class="tk-link" href="https://github.com/pixityy/Sidestage/releases/latest"><span class="circ"><svg aria-hidden="true"><use href="#dl"/></svg></span>Download<span class="sr"> Sidestage for Linux (experimental)</span></a>
-          </div>
-        </li>
-      </ul>
-      <div class="notice">
-        <svg aria-hidden="true"><use href="#hp"/></svg>
-        <p><b>Please note</b>This performance requires headphones. Sidestage renders binaural 3D audio; it does not work on speakers.</p>
-        <a href="https://github.com/pixityy/Sidestage/issues">Report how it runs on your system</a>
-      </div>
-
-      <div class="foh">
-        <div class="foh-head">
-          <p class="scene-no">Front of house</p>
-          <h3>Questions at the <em>door.</em></h3>
-          <p>Or build it yourself with Rust 1.95 or newer:</p>
-          <p class="term"><span class="pr">$</span> cargo run --release</p>
-        </div>
-        <div class="faq">
-          <details>
-            <summary>Does it work on speakers?</summary>
-            <p>No. Sidestage renders binaural audio, which needs one channel per ear. On speakers the 3D effect falls apart.</p>
-          </details>
-          <details>
-            <summary>Does Sidestage touch my game?</summary>
-            <p>Never. It captures only the apps you choose. The game's audio is not captured, routed or processed, so its footsteps and gunshots keep their exact position and timing.</p>
-          </details>
-          <details>
-            <summary>Why does the Windows Volume mixer show my music app at 0?</summary>
-            <p>That is how the original is hidden on Windows: the app is turned down to -120 dB and the captured copy is boosted back by the same amount. Use Sidestage's own volume slider instead. If Sidestage is killed, a helper process puts the app's volume back right away.</p>
-          </details>
-          <details>
-            <summary>The music sounds in front of me, not behind.</summary>
-            <p>Generic head models sometimes confuse front and back. Moving the music a little to one side, or adding distance and room, helps. On Windows, also turn off spatial sound (Windows Sonic, Dolby Atmos or DTS) for your headphones.</p>
-          </details>
-          <details>
-            <summary>My Bluetooth headset loses the effect.</summary>
-            <p>A headset in hands-free (microphone) mode switches to low-quality mono, which can't carry 3D audio. Use its stereo mode. On Windows, Sidestage warns you about this.</p>
-          </details>
-          <details>
-            <summary>What does it keep on my computer?</summary>
-            <p>Only its settings, its logs and small crash-recovery journals that record which app volumes or routes to put back. Audio is processed in memory and never saved, and nothing is sent anywhere.</p>
-          </details>
-        </div>
-      </div>
-    </div>
-  </section>
-</main>
-
-<footer class="curtain">
-  <div class="wrap">
-    <div class="curtain-top">
-      <p class="big">Curtain. <span>Enjoy the game.</span></p>
-      <ul class="foot-links">
-        <li><a href="https://github.com/pixityy/Sidestage/releases/latest">Download</a></li>
-        <li><a href="https://github.com/pixityy/Sidestage">Source</a></li>
-        <li><a href="https://github.com/pixityy/Sidestage/issues">Issues</a></li>
-        <li><a href="https://github.com/pixityy/Sidestage/blob/main/CHANGELOG.md">Changelog</a></li>
-        <li><a href="https://github.com/pixityy/Sidestage/blob/main/docs/DESIGN.md">How it works</a></li>
-      </ul>
-    </div>
-    <div class="colophon">
-      <a class="brand" href="#top" aria-label="Sidestage, back to top"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><use href="#icon"/></svg><span>Sidestage</span></a>
-      <span>Free forever · open source under <a href="https://github.com/pixityy/Sidestage/blob/main/LICENSE-MIT">MIT</a> OR <a href="https://github.com/pixityy/Sidestage/blob/main/LICENSE-APACHE">Apache-2.0</a></span>
-      <span>This page sets no cookies, runs no trackers and loads nothing from other sites.</span>
+      <p class="stage-note if-next"><span class="tag-new">Coming next</span>Several apps at once, each in its own spot, arrives in the next update. Version 0.1 places one app.</p>
     </div>
   </div>
+</section>
+
+<!-- ================================================================== HEAR IT -->
+<section class="sec demo" id="hear" aria-labelledby="hear-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="label"><span class="n">01</span> · Hear it in your browser</p>
+      <h2 class="kin" id="hear-title">Move the music. The footsteps stay put.</h2>
+      <p class="reveal">Press play: a lo-fi loop comes from the violet puck and a friend murmurs from the green one. Drag them anywhere around your head. The game's footsteps cross in front of you and skip the 3D stage completely, the same way your real game skips Sidestage.</p>
+    </div>
+
+    <div class="demo-grid" id="soundcheck">
+      <div class="demo-visual reveal">
+        <div class="radar-wrap" id="demo-wrap">
+          <svg class="field" id="demo-field" aria-hidden="true" focusable="false"></svg>
+          <svg class="radar" id="demo-radar" focusable="false" aria-labelledby="demo-radar-t"><title id="demo-radar-t">Interactive radar: a listener wearing headphones in the centre, with the music and a voice around them.</title></svg>
+          <div class="chip on" data-demo="music" style="--c:var(--accent)" aria-hidden="true"><i></i><span><b>Music</b><em>Behind you · 1.5 m</em></span></div>
+          <div class="chip on" data-demo="voice" style="--c:var(--ok)" aria-hidden="true"><i></i><span><b>Voice chat</b><em>Right · 1.0 m</em></span></div>
+        </div>
+        <div class="stagebar" aria-live="polite">
+          <span class="sb sb-state" id="d-run"><i aria-hidden="true"></i>Stopped</span>
+          <span class="sb sb-duck" id="d-duck"><i aria-hidden="true"></i>Ducking</span>
+          <span class="sb sb-bypass" id="d-bypass"><i aria-hidden="true"></i>Bypass</span>
+        </div>
+        <p class="hint">Drag a puck, or click the radar to move the selected one (<kbd>Ctrl</kbd> snaps to 15°). Keyboard: focus a puck, then use the arrow keys (<kbd>Shift</kbd> for small steps), <kbd>Page Up</kbd> and <kbd>Page Down</kbd> for height, <kbd>Home</kbd> to reset.</p>
+      </div>
+
+      <div class="panel reveal" style="--d:.12s">
+        <button class="play" id="play" type="button" aria-pressed="false">
+          <span class="play-ic" aria-hidden="true">
+            <svg class="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="5" width="4.2" height="14" rx="1.2"/><rect fill="currentColor" x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
+          </span>
+          <span><span id="play-label">Play the sound check</span><small id="play-sub">Synthesized live in this page</small></span>
+        </button>
+        <p class="hp-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0116 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.6"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6"/></svg><span><b>Use headphones.</b> Binaural 3D doesn't work on speakers.</span></p>
+        <p class="unsupported" id="unsupported" hidden>This browser can't play Web Audio, so the sound check stays silent here. The radar still moves.</p>
+
+        <div class="p-sec">
+          <p class="label" id="ro-who">Music position</p>
+          <p class="readout" id="ro-pos">Behind you · 1.5 m</p>
+          <p class="readout-sub" id="ro-sub">60° wide · height 0°</p>
+          <div class="pchips" role="group" aria-label="Music presets">
+            <button class="pchip" type="button" data-preset="behind" aria-pressed="true">Behind you</button>
+            <button class="pchip" type="button" data-preset="next" aria-pressed="false">Next room</button>
+            <button class="pchip" type="button" data-preset="far" aria-pressed="false">Far away</button>
+            <button class="pchip" type="button" data-preset="above" aria-pressed="false">Above</button>
+            <button class="pchip" type="button" data-preset="desk" aria-pressed="false">Desk speaker</button>
+            <button class="pchip" type="button" data-preset="lounge" aria-pressed="false">Lounge</button>
+          </div>
+        </div>
+
+        <div class="p-sec">
+          <p class="label">On stage</p>
+          <button class="tg" type="button" role="switch" aria-checked="true" data-layer="music">
+            <span class="tg-knob" aria-hidden="true"></span>
+            <span><b>Music</b><small>A lo-fi loop, placed in 3D. It ducks when the game is loud or someone talks.</small></span>
+          </button>
+          <button class="tg tg-voice" type="button" role="switch" aria-checked="true" data-layer="voice">
+            <span class="tg-knob" aria-hidden="true"></span>
+            <span><b>Voice chat</b><small>A murmuring friend, placed in 3D and never ducked.</small></span>
+          </button>
+          <button class="tg tg-game" type="button" role="switch" aria-checked="true" data-layer="game">
+            <span class="tg-knob" aria-hidden="true"></span>
+            <span><b>Game</b><small>Footsteps and shots, played straight to your ears, never through the 3D stage.</small></span>
+          </button>
+        </div>
+        <div class="p-sec">
+          <p class="label">Sound</p>
+          <div class="sound-row">
+            <button class="tg" id="tg-safe" type="button" role="switch" aria-checked="false">
+              <span class="tg-knob" aria-hidden="true"></span>
+              <span><b>Footstep-safe</b><small>Keeps 2–5 kHz clear.</small></span>
+            </button>
+            <button class="hold" id="bypass" type="button" aria-pressed="false">Hold to bypass <kbd>B</kbd></button>
+          </div>
+        </div>
+        <p class="honest"><b>An honest note:</b> everything here is synthesized on this page and placed with your browser's generic HRTF, not Sidestage's own renderer, and generic HRTFs often blur front and back. Treat it as a sketch of the idea; the app itself sounds different.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== FEATURES -->
+<section class="sec" id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="label"><span class="n">02</span> · The cue sheet</p>
+      <h2 class="kin" id="features-title">Everything that isn't the game, handled in the wings.</h2>
+      <p class="reveal">In a theatre, the cue sheet lists what happens offstage so the show runs clean. Here is Sidestage's.</p>
+    </div>
+
+    <div class="cues">
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>01</b></p>
+        <div class="cue-body">
+          <p class="label label-info">Game audio</p>
+          <h3>Your game is never touched.</h3>
+          <p>Sidestage captures only the apps you pick. Your game is never captured, routed or processed, so footsteps and gunshots keep their exact position and timing.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <svg class="vis-svg" viewBox="0 0 340 112">
+            <rect x="1" y="12" width="74" height="28" rx="7" class="fl-chip fl-game"/>
+            <text x="38" y="26" class="fl-t fl-tg" text-anchor="middle" dominant-baseline="central">GAME</text>
+            <path d="M80 26H286" class="fl-line fl-lg"/>
+            <path d="M280 21l7 5-7 5" class="fl-line fl-lg"/>
+            <text x="180" y="12" class="fl-t fl-small" text-anchor="middle">UNTOUCHED</text>
+            <rect x="1" y="72" width="74" height="28" rx="7" class="fl-chip fl-app"/>
+            <text x="38" y="86" class="fl-t" text-anchor="middle" dominant-baseline="central">APPS</text>
+            <path d="M80 86H118" class="fl-line fl-la"/>
+            <rect x="120" y="70" width="104" height="32" rx="16" class="fl-stage"/>
+            <text x="172" y="86" class="fl-t" text-anchor="middle" dominant-baseline="central">3D STAGE</text>
+            <path d="M228 86C262 86 264 44 288 36" class="fl-line fl-la"/>
+            <g class="fl-hp" transform="translate(296 10)"><path d="M3 24v-7a15 15 0 0130 0v7"/><rect x="0" y="21" width="9" height="15" rx="3"/><rect x="27" y="21" width="9" height="15" rx="3"/></g>
+          </svg>
+        </div>
+      </article>
+
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>02</b></p>
+        <div class="cue-body">
+          <p class="label">The radar</p>
+          <h3>Drag a sound anywhere around your head.</h3>
+          <p>Direction, distance from 0.5 to 20 m on a log scale (or the scroll wheel), and height with Shift-drag. Ctrl snaps to 15°, a double-click goes back to the preset, and the arrow keys work too. Or start from one of six presets.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <div class="presets"><span class="on">Behind you</span><span>Next room</span><span>Far away</span><span>Above</span><span>Desk speaker</span><span>Lounge</span></div>
+        </div>
+      </article>
+
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>03</b></p>
+        <div class="cue-body">
+          <p class="label">Footstep-safe</p>
+          <h3>Music stays out of the footstep band.</h3>
+          <p>One switch cuts the music by at least 6 dB around 3.2 kHz, where footsteps live, rolls off the highs, lowers the bass and makes ducking competitive. The cues you play by stay clear.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <svg class="vis-svg" viewBox="0 0 340 122">
+            <rect x="198" y="14" width="56.5" height="86" class="sp-band"/>
+            <text x="226.25" y="8" class="sp-t sp-tb" text-anchor="middle">2–5 kHz</text>
+            <path d="M14 100H328" class="sp-axis"/>
+            <path d="M14 44C60 34 120 36 170 46S270 64 326 88" class="sp-orig"/>
+            <path d="M14 44C60 34 120 36 170 46C186 50 196 58 206 76C216 90 238 90 248 76C256 66 262 64 272 68C292 76 310 82 326 88L326 100H14Z" class="sp-fill"/>
+            <path d="M14 44C60 34 120 36 170 46C186 50 196 58 206 76C216 90 238 90 248 76C256 66 262 64 272 68C292 76 310 82 326 88" class="sp-music"/>
+            <text x="14" y="116" class="sp-t">100 Hz</text>
+            <text x="155.6" y="116" class="sp-t" text-anchor="middle">1 kHz</text>
+            <text x="297" y="116" class="sp-t" text-anchor="middle">10 kHz</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>04</b></p>
+        <div class="cue-body">
+          <p class="label">Ducking</p>
+          <h3>Music steps back when the game gets loud.</h3>
+          <p>Sidestage listens to everything except the music to decide. Choose how hard: Off, Gentle, Standard or Competitive.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <div class="seg"><span>Off</span><span>Gentle</span><span class="on">Standard</span><span>Competitive</span></div>
+          <svg class="vis-svg" viewBox="0 0 340 64">
+            <rect x="70" y="4" width="34" height="58" class="dk-zone"/>
+            <rect x="200" y="4" width="34" height="58" class="dk-zone"/>
+            <path d="M10 14H66C72 14 74 30 80 30H100C112 30 116 14 128 14H196C202 14 204 30 210 30H232C244 30 248 14 260 14H284" class="dk-music"/>
+            <path d="M10 60H70L76 38L84 54L90 42L98 60H200L206 36L214 55L222 44L230 60H284" class="dk-game"/>
+            <text x="332" y="14" class="sp-t" text-anchor="end" dominant-baseline="central" style="fill:var(--accent-hi)">MUSIC</text>
+            <text x="332" y="60" class="sp-t sp-tb" text-anchor="end" dominant-baseline="central">GAME</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>05</b></p>
+        <div class="cue-body">
+          <p class="label">No double audio</p>
+          <h3>You never hear an app twice.</h3>
+          <p>The app's normal sound is hidden automatically while Sidestage plays it in 3D. If Sidestage is killed, your audio comes back: a helper process restores it on Windows and Linux, and macOS does it by itself. <code>sidestage restore</code> is there if you ever need it.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <div class="statusline"><i></i>Capturing Spotify · 48 kHz · Original hidden <span class="ck">✓</span></div>
+          <span class="code"><span class="pr">$</span>sidestage restore</span>
+        </div>
+      </article>
+
+      <article class="cue reveal">
+        <p class="cue-n">Cue<b>06</b></p>
+        <div class="cue-body">
+          <p class="label">Privacy</p>
+          <h3>Nothing leaves your machine.</h3>
+          <p>There is no network code in Sidestage at all. No telemetry, no accounts, no update checks. Audio is processed in memory and never recorded.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <dl class="leaders">
+            <div><dt>Network code</dt><dd>none</dd></div>
+            <div><dt>Telemetry</dt><dd>none</dd></div>
+            <div><dt>Accounts</dt><dd>none</dd></div>
+            <div><dt>Update checks</dt><dd>none</dd></div>
+          </dl>
+        </div>
+      </article>
+
+      <article class="cue cue-next reveal">
+        <p class="cue-n"><span class="if-next">Next</span><span class="if-out">New</span><b>07</b></p>
+        <div class="cue-body">
+          <p class="label"><span class="tag-new"><span class="if-next">New · coming next</span><span class="if-out">New</span></span></p>
+          <h3>Several sources at once, and voices at your side.</h3>
+          <p>Each source gets its own position and preset. Voice-chat presets tuned for Discord come with a leveler and a clarity boost. Voice is never ducked for the game, music can turn down while someone talks, and a "Never duck for these apps" list does exactly what it says.</p>
+        </div>
+        <div class="cue-vis" aria-hidden="true">
+          <div class="next-vis">
+            <svg class="mini" viewBox="-62 -62 124 124">
+              <path d="M0 0L-46.77-27A54 54 0 0 1 46.77-27Z" class="m-wedge"/>
+              <circle r="8.64" class="m-ring"/><circle r="17.16" class="m-ring"/><circle r="25.69" class="m-ring"/><circle r="36.95" class="m-ring"/><circle r="45.48" class="m-ring"/><circle r="54" class="m-ring" style="stroke-opacity:.2"/>
+              <circle r="5.4" class="m-head"/>
+              <circle cy="22.15" r="5" class="m-music"/>
+              <circle cx="-19.4" r="4.4" class="m-pod"/>
+              <circle cx="19.4" r="4.4" class="m-voice"/>
+            </svg>
+            <div class="vchips"><span>Voice chat left</span><span>Voice chat right</span><span>Over your shoulder</span><span>Radio comms</span><span class="pod">Podcast left</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== PROOF -->
+<section class="sec" id="proof" aria-labelledby="proof-title" style="padding-top:clamp(40px, 6vw, 80px)">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="label"><span class="n">03</span> · On real hardware</p>
+      <h2 class="kin" id="proof-title">Spotify behind you. Valorant exactly as it was.</h2>
+      <p class="reveal">Version 0.1 was tested on Windows 11 with Spotify spatialized while playing Valorant. Both of these show the real app, not a mock-up.</p>
+    </div>
+    <div class="proof-grid">
+      <figure class="shot reveal">
+        <div class="frame"><img src="media/screenshot-main.png" width="1500" height="990" loading="lazy" decoding="async" alt="The Sidestage window: the app list on the left with Spotify selected, the radar in the middle with the music placed behind the listener at 1.5 metres and 60 degrees wide, and the presets and sound controls on the right."></div>
+        <figcaption>The radar, the app list and the presets. Behind you at 1.5 m is the default.</figcaption>
+      </figure>
+      <div class="reveal" style="--d:.1s">
+        <figure class="vid">
+          <div class="frame"><video controls preload="none" playsinline poster="media/demo-poster.jpg" width="1280" height="800" aria-label="Demo video: Sidestage moving Spotify around the listener while a Valorant match plays"><source src="media/sidestage-demo.mp4" type="video/mp4"><a href="media/sidestage-demo.mp4">Download the demo video (MP4, 9.4 MB)</a></video></div>
+          <figcaption><span class="label">Demo video · sound on, headphones on</span>Spotify moving around the listener while Valorant plays normally. Blurred for privacy.</figcaption>
+        </figure>
+        <ul class="facts">
+          <li><span><b>Windows 11:</b> tested on real hardware.</span></li>
+          <li class="x"><span><b>macOS 14.2+ and Linux:</b> build and pass CI, not yet tried on real machines.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stills">
+      <div class="stills-head">
+        <div>
+          <p class="label"><span class="tag-new"><span class="if-next">Coming next</span><span class="if-out">New</span></span>Production stills</p>
+          <h3>Three sources, voice presets, a never-duck list.</h3>
+        </div>
+        <p class="if-next">Screens of the next update go in these frames when it ships. Until then they hold <b>stand-ins from 0.1</b>, marked as such.</p>
+      </div>
+      <ul class="stills-grid">
+        <li class="still reveal" data-slot="sources">
+          <figure class="shot">
+            <div class="frame">
+              <img src="media/screenshot-light.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1 in its light theme, with Spotify behind the listener on the radar.">
+              <span class="standin">0.1 stand-in</span>
+            </div>
+            <figcaption><b>Several sources at once</b>Shown for now: 0.1 in its light theme, with one source.</figcaption>
+          </figure>
+        </li>
+        <li class="still reveal" data-slot="voice" style="--d:.08s">
+          <figure class="shot">
+            <div class="frame">
+              <img src="media/screenshot-ducking.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1's sound sliders and ducking controls, with the live game level.">
+              <span class="standin">0.1 stand-in</span>
+            </div>
+            <figcaption><b>Voice presets for Discord</b>Shown for now: 0.1's sound and ducking controls.</figcaption>
+          </figure>
+        </li>
+        <li class="still reveal" data-slot="never-duck" style="--d:.16s">
+          <figure class="shot">
+            <div class="frame">
+              <img src="media/screenshot-diagnostics.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1's Diagnostics window with latency, dropouts and clock drift.">
+              <span class="standin">0.1 stand-in</span>
+            </div>
+            <figcaption><b>Never duck for these apps</b>Shown for now: 0.1's Diagnostics window.</figcaption>
+          </figure>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== DOWNLOAD -->
+<section class="sec download" id="download" aria-labelledby="download-title">
+  <div class="stage-light" aria-hidden="true"></div>
+  <svg class="sfield" id="dl-field" data-depth=".1" aria-hidden="true" focusable="false"></svg>
+  <div class="wrap">
+    <div class="sec-head center">
+      <p class="label"><span class="n">04</span> · Download</p>
+      <h2 class="kin" id="download-title">Free forever. Bring headphones.</h2>
+      <p class="reveal">No price, no account, no telemetry. Pick your system; every button goes to the latest release on GitHub.</p>
+    </div>
+    <div class="platforms">
+      <article class="plat reveal" data-os="win">
+        <span class="mine-tag">Your system</span>
+        <div class="plat-top"><h3>Windows</h3><span class="status ok"><i aria-hidden="true"></i>Tested</span></div>
+        <p class="plat-req">Windows 11 · Windows 10 2004+ may work</p>
+        <p>Tested on real hardware, with Spotify spatialized while playing Valorant. Unzip and run <code>sidestage.exe</code>.</p>
+        <p class="fine">Not code-signed yet, so SmartScreen warns you the first time: choose More info, then Run anyway.</p>
+        <a class="btn btn-primary" href="https://github.com/pixityy/Sidestage/releases/latest">Download for Windows</a>
+      </article>
+      <article class="plat reveal" data-os="mac" style="--d:.08s">
+        <span class="mine-tag">Your system</span>
+        <div class="plat-top"><h3>macOS</h3><span class="status exp"><i aria-hidden="true"></i>Experimental</span></div>
+        <p class="plat-req">macOS 14.2 or later · Apple silicon and Intel</p>
+        <p>Builds and passes its tests in CI, but hasn't been tried on a real Mac yet.</p>
+        <p class="fine">Not notarized yet: open it once, then allow it in System Settings, Privacy &amp; Security. Reports are very welcome.</p>
+        <a class="btn btn-ghost" href="https://github.com/pixityy/Sidestage/releases/latest">Download for macOS</a>
+      </article>
+      <article class="plat reveal" data-os="linux" style="--d:.16s">
+        <span class="mine-tag">Your system</span>
+        <div class="plat-top"><h3>Linux</h3><span class="status exp"><i aria-hidden="true"></i>Experimental</span></div>
+        <p class="plat-req">x86_64 · PipeWire or PulseAudio</p>
+        <p>Builds and passes its tests in CI, but hasn't been tried on a real desktop yet.</p>
+        <p class="fine">If it runs (or doesn't) on your distro, an issue on GitHub helps a lot.</p>
+        <a class="btn btn-ghost" href="https://github.com/pixityy/Sidestage/releases/latest">Download for Linux</a>
+      </article>
+    </div>
+    <p class="dl-strip">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0116 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.6"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6"/></svg>Headphones required: binaural 3D doesn't work on speakers.</span>
+      <span class="plain">Open source under MIT OR Apache-2.0. <a href="https://github.com/pixityy/Sidestage">Read the code</a></span>
+    </p>
+  </div>
+</section>
+
+<!-- ================================================================== QUESTIONS -->
+<section class="sec" id="questions" aria-labelledby="questions-title" style="padding-top:clamp(40px, 6vw, 80px)">
+  <div class="wrap faq-grid">
+    <div class="sec-head">
+      <p class="label"><span class="n">05</span> · Questions</p>
+      <h2 class="kin" id="questions-title">Before the curtain goes up.</h2>
+      <p class="reveal">Or build it yourself with Rust 1.95 or newer:</p>
+      <span class="code reveal"><span class="pr">$</span>cargo run --release</span>
+    </div>
+    <div class="faq reveal">
+      <details>
+        <summary>Does it work on speakers?</summary>
+        <p>No. Sidestage renders binaural audio, which needs one channel per ear. On speakers the 3D effect falls apart.</p>
+      </details>
+      <details>
+        <summary>Does Sidestage touch my game?</summary>
+        <p>Never. It captures only the apps you choose. The game's audio is not captured, routed or processed, so its footsteps and gunshots keep their exact position and timing.</p>
+      </details>
+      <details>
+        <summary>Why does the Windows Volume mixer show my music app at 0?</summary>
+        <p>That is how the original is hidden on Windows: the app is turned down to -120 dB and the captured copy is boosted back by the same amount. Use Sidestage's own volume slider instead. If Sidestage is killed, a helper process puts the app's volume back right away.</p>
+      </details>
+      <details>
+        <summary>The music sounds in front of me, not behind.</summary>
+        <p>Generic head models sometimes confuse front and back. Moving the music a little to one side, or adding distance and room, helps. On Windows, also turn off spatial sound (Windows Sonic, Dolby Atmos or DTS) for your headphones.</p>
+      </details>
+      <details>
+        <summary>My Bluetooth headset loses the effect.</summary>
+        <p>A headset in hands-free (microphone) mode switches to low-quality mono, which can't carry 3D audio. Use its stereo mode. On Windows, Sidestage warns you about this.</p>
+      </details>
+      <details>
+        <summary>What does it keep on my computer?</summary>
+        <p>Only its settings, its logs and small crash-recovery journals that record which app volumes or routes to put back. Audio is processed in memory and never saved, and nothing is sent anywhere.</p>
+      </details>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <a class="brand" href="#top" aria-label="Sidestage, back to top">
+      <svg viewBox="-1 -1 2 2" aria-hidden="true" focusable="false">
+        <defs><linearGradient id="ig-foot" x1="0" y1="-1" x2="0" y2="1" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--icon-top)"/><stop offset="1" style="stop-color:var(--icon-bottom)"/></linearGradient></defs>
+        <rect x="-.98" y="-.98" width="1.96" height="1.96" rx=".2" fill="url(#ig-foot)"/>
+        <g fill="none" style="stroke:var(--on-accent)"><circle cy="-.12" r=".52" stroke-width=".05" stroke-opacity=".35"/><circle cy="-.12" r=".78" stroke-width=".04" stroke-opacity=".21"/></g>
+        <circle cy=".62" r=".15" style="fill:var(--light)"/>
+        <path d="M-.08-.3L0-.44L.08-.3Z" style="fill:var(--on-accent)"/>
+        <circle cy="-.12" r=".22" style="fill:var(--on-accent)"/>
+      </svg>
+      <span>Sidestage</span>
+    </a>
+    <p>Free forever · MIT OR Apache-2.0 · sidestage.it.com</p>
+    <nav aria-label="Footer">
+      <a href="https://github.com/pixityy/Sidestage">GitHub</a>
+      <a href="https://github.com/pixityy/Sidestage/releases/latest">Latest release</a>
+      <a href="https://github.com/pixityy/Sidestage/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/pixityy/Sidestage/blob/main/docs/DESIGN.md">How it works</a>
+      <a href="https://github.com/pixityy/Sidestage/issues">Report an issue</a>
+    </nav>
+    <p class="fine">This site sets no cookies, runs no analytics and loads nothing from other sites. The app has no network code at all.</p>
+  </div>
 </footer>
+</div>
 </body>
 </html>
