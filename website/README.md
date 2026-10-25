@@ -1,0 +1,72 @@
+# sidestage.it.com
+
+The Sidestage website: plain static HTML, CSS and JavaScript modules with self-hosted fonts. It
+has no build step, no tracking, no cookies and no third-party requests.
+
+| Path | What |
+|---|---|
+| `index.html` | The page, in five acts: the stage (hero), the cast, the sound check, the programme, the box office |
+| `css/site.css` | All styles. Colours are the app's dark palette from `crates/sidestage/src/ui/theme.rs` |
+| `js/stage.js` | Radar geometry and SVG, the same as the app's `radar.rs` (log rings, GAME wedge, head) |
+| `js/hero.js` | The hero's load sequence and ducking loop, and the six preset plans |
+| `js/listen.js`, `js/audio.js` | The sound check: the draggable radar, and its sound made with Web Audio (HRTF panners) |
+| `fonts/` | Bodoni Moda, Hanken Grotesk and Fragment Mono (latin subsets) with their OFL licences |
+| `404.html`, `favicon.svg`, `CNAME` | Pages extras |
+| `serve.py` | Local preview server; not published |
+
+## Preview locally
+
+```bash
+python website/serve.py
+```
+
+Then open <http://127.0.0.1:8770/>. The script serves `website/` at `/` and `docs/media/` at
+`/media/`, the same layout the deploy workflow builds.
+
+## When the multi-source update ships
+
+1. In `index.html`, change `<html lang="en" data-update="next">` to `data-update="out"`. That swaps
+   every "Next update" badge and sentence for its released wording.
+2. Put the new screenshots in `docs/media/` and point the three frames under "Production stills"
+   (`<li class="shot" data-slot="...">`) at them. In each one, replace the `img` `src`, `alt`,
+   `width` and `height`, delete the `<span class="standin">`, rewrite the `figcaption`, and add the
+   class `final` to the `li`. Delete the `.stills-head` paragraph about stand-ins.
+
+## How it is published
+
+`.github/workflows/pages.yml` runs on every push to `main` that touches `website/`, `docs/media/` or
+the workflow itself, and by hand from the Actions tab. It copies `website/` into `_site/`, adds the
+screenshots, poster and demo video from `docs/media/` under `_site/media/`, and deploys that to
+GitHub Pages. The media files live only once in the repository, in `docs/media/`.
+
+## Going live (one-time setup, done by the repository owner)
+
+1. **Repository settings.** Settings > Pages > Build and deployment > Source: **GitHub Actions**.
+2. **Run the workflow** once: push to `main`, or Actions > Website > Run workflow.
+3. **DNS at the registrar for sidestage.it.com.** `it.com` is on the Public Suffix List, so
+   `sidestage.it.com` is an apex domain: use A and AAAA records at the root, not a CNAME. Remove
+   the parking or URL-redirect records the registrar added (the name currently points at a parking
+   page), then create:
+
+   | Type | Host | Value |
+   |---|---|---|
+   | A | `@` | `185.199.108.153` |
+   | A | `@` | `185.199.109.153` |
+   | A | `@` | `185.199.110.153` |
+   | A | `@` | `185.199.111.153` |
+   | AAAA | `@` | `2606:50c0:8000::153` |
+   | AAAA | `@` | `2606:50c0:8001::153` |
+   | AAAA | `@` | `2606:50c0:8002::153` |
+   | AAAA | `@` | `2606:50c0:8003::153` |
+   | CNAME | `www` | `pixityy.github.io` |
+
+4. **Custom domain.** Settings > Pages > Custom domain: `sidestage.it.com`, then Save. With a
+   workflow deployment GitHub uses this setting, not the `CNAME` file (which is kept for clarity
+   and in case the site is ever deployed from a branch). Wait for the DNS check to pass, then tick
+   **Enforce HTTPS**. The certificate can take up to an hour after DNS resolves.
+5. **Recommended: verify the domain**, so nobody else can claim it for their Pages site. In your
+   GitHub profile: Settings > Pages > Add a domain, then add the TXT record it shows
+   (`_github-pages-challenge-pixityy`) at the registrar.
+
+Before saving the custom domain, check the records with `nslookup sidestage.it.com`. It should list
+the four `185.199.x.153` addresses.
