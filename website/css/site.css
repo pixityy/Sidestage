@@ -16,6 +16,9 @@
   --warn:#F2B33D; --err:#F36A6A; --info:#6CB4FF;
   --icon-top:#A08CFF; --icon-bottom:#5B3EE0;
   --light:#FFD36E; --light-hi:#FFEFC7; --light-deep:#C48A22;
+  /* Source colours, as the app gives them: violet (the accent), then teal, then coral. */
+  --c-pod:#2FC2A8; --c-pod-hi:#A8EEDF; --c-pod-deep:#16806D;
+  --c-voice:#FF7A6B; --c-voice-hi:#FFC6BE; --c-voice-deep:#C4473A;
   --on-accent:#FFFFFF; --on-warm:#17130A;
   --info-text:color-mix(in srgb, var(--info) 78%, var(--text));
 
@@ -143,25 +146,25 @@ h1 .w{display:inline-block}
 .wave{fill:none;stroke-width:1.25;vector-effect:non-scaling-stroke;pointer-events:none}
 .tether{stroke-width:1;vector-effect:non-scaling-stroke;opacity:0;transition:opacity .7s ease}
 .tether.on{opacity:.4}
-.t-music{stroke:var(--accent)} .t-voice{stroke:var(--ok)} .t-pod{stroke:var(--light)}
+.t-music{stroke:var(--accent)} .t-voice{stroke:var(--c-voice)} .t-pod{stroke:var(--c-pod)}
 .lr-arc{fill:none;stroke:var(--accent);stroke-opacity:.5;stroke-width:3;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .lr-dot{fill:var(--stage);stroke:var(--accent);stroke-opacity:.9;stroke-width:1.5;vector-effect:non-scaling-stroke}
 .lr-t{fill:var(--text-dim);font-family:var(--font-mono);font-weight:500}
-.tr-music{fill:var(--accent)} .tr-voice{fill:var(--ok)} .tr-pod{fill:var(--light)}
+.tr-music{fill:var(--accent)} .tr-voice{fill:var(--c-voice)} .tr-pod{fill:var(--c-pod)}
 
 /* Pucks: luminous bodies */
 .p-body{stroke-width:1.5;vector-effect:non-scaling-stroke}
 .puck-music .p-body{stroke:var(--accent-hi)}
-.puck-voice .p-body{stroke:var(--ok-hi)}
-.puck-pod .p-body{stroke:var(--light-hi)}
+.puck-voice .p-body{stroke:var(--c-voice-hi)}
+.puck-pod .p-body{stroke:var(--c-pod-hi)}
 .p-halo{fill-opacity:.2}
-.puck-music .p-halo{fill:var(--accent)} .puck-voice .p-halo{fill:var(--ok)} .puck-pod .p-halo{fill:var(--light)}
+.puck-music .p-halo{fill:var(--accent)} .puck-voice .p-halo{fill:var(--c-voice)} .puck-pod .p-halo{fill:var(--c-pod)}
 .gl{fill:var(--on-accent)} .gl-s{fill:none;stroke:var(--on-accent);stroke-linecap:round;stroke-linejoin:round}
 .puck-voice .gl,.puck-pod .gl{fill:var(--on-warm)}
 .puck-voice .gl-s,.puck-pod .gl-s{stroke:var(--on-warm)}
-.puck-voice .gl-cut{fill:var(--ok)}
+.puck-voice .gl-cut{fill:var(--c-voice)}
 .p-duck{fill:none;stroke:var(--warn);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0}
-.p-speak{fill:none;stroke:var(--ok);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;transition:opacity .15s}
+.p-speak{fill:none;stroke:var(--c-voice);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;transition:opacity .15s}
 .speaking .p-speak{opacity:.95}
 .p-core{transition:opacity .3s ease}
 .ducked .p-core{opacity:.6;transition:opacity .08s}
@@ -374,10 +377,10 @@ section.sec{position:relative;padding:clamp(88px, 11vw, 150px) 0}
 .m-ring{fill:none;stroke:var(--text);stroke-opacity:.12;stroke-width:1;vector-effect:non-scaling-stroke}
 .m-wedge{fill:var(--info);fill-opacity:.08}
 .m-head{fill:var(--surface-hi);stroke:var(--text-dim);stroke-width:1;vector-effect:non-scaling-stroke}
-.m-music{fill:var(--accent)} .m-voice{fill:var(--ok)} .m-pod{fill:var(--light)}
+.m-music{fill:var(--accent)} .m-voice{fill:var(--c-voice)} .m-pod{fill:var(--c-pod)}
 .vchips{display:flex;flex-wrap:wrap;gap:6px}
-.vchips span{padding:5px 9px;border-radius:6px;border:1px solid color-mix(in srgb, var(--ok) 32%, var(--border));background:color-mix(in srgb, var(--ok) 7%, var(--surface));font-size:.75rem;color:var(--text);white-space:nowrap}
-.vchips span.pod{border-color:color-mix(in srgb, var(--light) 36%, var(--border));background:color-mix(in srgb, var(--light) 7%, var(--surface))}
+.vchips span{padding:5px 9px;border-radius:6px;border:1px solid color-mix(in srgb, var(--c-voice) 34%, var(--border));background:color-mix(in srgb, var(--c-voice) 7%, var(--surface));font-size:.75rem;color:var(--text);white-space:nowrap}
+.vchips span.pod{border-color:color-mix(in srgb, var(--c-pod) 36%, var(--border));background:color-mix(in srgb, var(--c-pod) 7%, var(--surface))}
 
 /* ----------------------------------------------------------------------- Proof section */
 .proof-grid{display:grid;grid-template-columns:minmax(0, 1.5fr) minmax(0, 1fr);gap:clamp(20px, 3vw, 36px);align-items:start}
@@ -467,7 +470,7 @@ html[data-update="next"] .if-out,html[data-update="out"] .if-next{display:none!i
 .hbadge rect{fill:var(--surface);stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke}
 .hbadge path{fill:var(--accent-hi)}
 .hbadge text{fill:var(--text);font-family:var(--font-mono);font-weight:500}
-.tg-voice[aria-checked="true"] .tg-knob{background:color-mix(in srgb, var(--ok) 55%, var(--surface));border-color:var(--ok)}
+.tg-voice[aria-checked="true"] .tg-knob{background:color-mix(in srgb, var(--c-voice) 55%, var(--surface));border-color:var(--c-voice)}
 .sound-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid color-mix(in srgb, var(--border) 80%, transparent)}
 .sound-row .tg{flex:1 1 220px;border-top:0}
 .hold{display:inline-flex;align-items:center;gap:10px;min-height:40px;padding:0 14px;border-radius:var(--r-ctl);border:1px solid var(--border);background:color-mix(in srgb, var(--surface-hi) 70%, transparent);color:var(--text);font:500 .9rem var(--font-body);cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:none;transition:background-color .15s, border-color .15s}
@@ -476,21 +479,19 @@ html[data-update="next"] .if-out,html[data-update="out"] .if-next{display:none!i
 .hold[aria-pressed="true"] kbd{background:transparent;color:var(--on-accent);border-color:color-mix(in srgb, var(--on-accent) 40%, transparent)}
 .unsupported{margin:12px 0 0;padding:10px 12px;border-radius:var(--r-ctl);border:1px solid color-mix(in srgb, var(--err) 40%, transparent);font-size:.875rem;color:var(--text-dim)}
 
-/* Stills from the next update (0.1 stand-ins until it ships) */
+/* Production stills of the next update */
 .stills{margin-top:clamp(64px, 8vw, 110px)}
 .stills-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 40px;margin-bottom:22px}
 .stills-head h3{font-family:var(--font-display);font-weight:700;font-stretch:90%;font-size:clamp(1.625rem, 1.4vw + 1rem, 2.25rem);letter-spacing:-.02em;line-height:1.05;margin-top:10px}
 .stills-head p:not(.label){margin:0;max-width:34em;color:var(--text-dim);font-size:.9375rem}
-.stills-head p b{color:var(--warn);font-weight:600}
-.stills-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:clamp(14px, 2vw, 22px)}
-@media (max-width:860px){.stills-grid{grid-template-columns:minmax(0, 1fr);max-width:620px}}
-.still .frame{aspect-ratio:1500/990;border-style:dashed;border-color:color-mix(in srgb, var(--warn) 45%, var(--border))}
-.still .frame img{height:100%;object-fit:cover;opacity:.85;transition:opacity .3s}
-.still:hover .frame img{opacity:1}
-.still.final .frame{border-style:solid;border-color:var(--border)}
-.still.final .frame img{opacity:1}
-.standin{position:absolute;top:10px;left:10px;padding:5px 9px;border-radius:6px;background:color-mix(in srgb, var(--stage) 82%, transparent);border:1px solid color-mix(in srgb, var(--warn) 55%, transparent);color:var(--warn);
-  font-family:var(--font-mono);font-size:.625rem;font-weight:600;font-stretch:87.5%;letter-spacing:.14em;text-transform:uppercase;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* A lead still with two beside it (same aspect, so the columns line up), then two more below. */
+.stills-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6, minmax(0, 1fr));gap:clamp(14px, 2vw, 22px);align-items:start}
+.s-lead{grid-column:span 4;grid-row:span 2}
+.s-side{grid-column:span 2}
+.s-half{grid-column:span 3}
+@media (max-width:860px){.stills-grid{grid-template-columns:minmax(0, 1fr);max-width:640px}.s-lead,.s-side,.s-half{grid-column:auto;grid-row:auto}}
+.still .frame{aspect-ratio:1500/990}
+.still .frame img{height:100%;object-fit:cover}
 .still figcaption b{display:block;color:var(--text);font-weight:600}
 
 /* Questions */

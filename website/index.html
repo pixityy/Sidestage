@@ -100,8 +100,8 @@
         <svg class="field" id="hero-field" data-speed=".22" aria-hidden="true" focusable="false"></svg>
         <svg class="radar" id="hero-radar" role="img" aria-labelledby="hero-radar-t" focusable="false"><title id="hero-radar-t">The Sidestage radar seen from above: Spotify sits behind your head at 1.5 metres, a podcast on your left, Discord on your right, and the shaded game area in front stays untouched.</title></svg>
         <div class="chip" data-src="music" style="--c:var(--accent)" aria-hidden="true"><i></i><span><b>Spotify</b><em>Behind you · 1.5 m · 60° wide</em></span></div>
-        <div class="chip" data-src="pod" style="--c:var(--light)" aria-hidden="true"><i></i><span><b>Podcast</b><em>Podcast left</em></span></div>
-        <div class="chip" data-src="voice" style="--c:var(--ok)" aria-hidden="true"><i></i><span><b>Discord</b><em>Voice chat right</em></span></div>
+        <div class="chip" data-src="pod" style="--c:var(--c-pod)" aria-hidden="true"><i></i><span><b>Podcast</b><em>Podcast left</em></span></div>
+        <div class="chip" data-src="voice" style="--c:var(--c-voice)" aria-hidden="true"><i></i><span><b>Discord</b><em>Voice chat right</em></span></div>
         <noscript><img src="media/screenshot-main.png" width="1500" height="990" alt="The Sidestage app with its radar, Spotify placed behind the listener."></noscript>
       </div>
       <div class="stagebar">
@@ -109,7 +109,7 @@
         <span class="sb sb-game"><i aria-hidden="true"></i>Game audio: never captured</span>
         <span class="sb sb-duck" id="sb-duck"><i aria-hidden="true"></i>Ducking</span>
       </div>
-      <p class="stage-note if-next"><span class="tag-new">Coming next</span>Several apps at once, each in its own spot, arrives in the next update. Version 0.1 places one app.</p>
+      <p class="stage-note if-next"><span class="tag-new">Coming next</span>Up to 8 apps at once, each in its own spot, arrives in the next update. Version 0.1 places one app.</p>
     </div>
   </div>
 </section>
@@ -120,7 +120,7 @@
     <div class="sec-head">
       <p class="label"><span class="n">01</span> · Hear it in your browser</p>
       <h2 class="kin" id="hear-title">Move the music. The footsteps stay put.</h2>
-      <p class="reveal">Press play: a lo-fi loop comes from the violet puck and a friend murmurs from the green one. Drag them anywhere around your head. The game's footsteps cross in front of you and skip the 3D stage completely, the same way your real game skips Sidestage.</p>
+      <p class="reveal">Press play: a lo-fi loop comes from the violet puck and a friend murmurs from the coral one. Drag them anywhere around your head. The game's footsteps cross in front of you and skip the 3D stage completely, the same way your real game skips Sidestage.</p>
     </div>
 
     <div class="demo-grid" id="soundcheck">
@@ -129,7 +129,7 @@
           <svg class="field" id="demo-field" aria-hidden="true" focusable="false"></svg>
           <svg class="radar" id="demo-radar" focusable="false" aria-labelledby="demo-radar-t"><title id="demo-radar-t">Interactive radar: a listener wearing headphones in the centre, with the music and a voice around them.</title></svg>
           <div class="chip on" data-demo="music" style="--c:var(--accent)" aria-hidden="true"><i></i><span><b>Music</b><em>Behind you · 1.5 m</em></span></div>
-          <div class="chip on" data-demo="voice" style="--c:var(--ok)" aria-hidden="true"><i></i><span><b>Voice chat</b><em>Right · 1.0 m</em></span></div>
+          <div class="chip on" data-demo="voice" style="--c:var(--c-voice)" aria-hidden="true"><i></i><span><b>Voice chat</b><em>Right · 1.0 m</em></span></div>
         </div>
         <div class="stagebar" aria-live="polite">
           <span class="sb sb-state" id="d-run"><i aria-hidden="true"></i>Stopped</span>
@@ -318,8 +318,8 @@
         <p class="cue-n"><span class="if-next">Next</span><span class="if-out">New</span><b>07</b></p>
         <div class="cue-body">
           <p class="label"><span class="tag-new"><span class="if-next">New · coming next</span><span class="if-out">New</span></span></p>
-          <h3>Several sources at once, and voices at your side.</h3>
-          <p>Each source gets its own position and preset. Voice-chat presets tuned for Discord come with a leveler and a clarity boost. Voice is never ducked for the game, music can turn down while someone talks, and a "Never duck for these apps" list does exactly what it says.</p>
+          <h3>Up to 8 sources at once, and voices at your side.</h3>
+          <p>Each source gets its own position, colour and preset. Voice-chat presets tuned for Discord come with a clarity boost and a leveler: a friend who is 12 dB louder or quieter comes out within about 4 dB. Voice chat is never ducked for the game, your other sources can turn down while it talks, and a "Never duck for these apps" list keeps sounds like a video in your browser from turning your sources down.</p>
         </div>
         <div class="cue-vis" aria-hidden="true">
           <div class="next-vis">
@@ -355,7 +355,7 @@
       <div class="reveal" style="--d:.1s">
         <figure class="vid">
           <div class="frame"><video controls preload="none" playsinline poster="media/demo-poster.jpg" width="1280" height="800" aria-label="Demo video: Sidestage moving Spotify around the listener while a Valorant match plays"><source src="media/sidestage-demo.mp4" type="video/mp4"><a href="media/sidestage-demo.mp4">Download the demo video (MP4, 9.4 MB)</a></video></div>
-          <figcaption><span class="label">Demo video · sound on, headphones on</span>Spotify moving around the listener while Valorant plays normally. Blurred for privacy.</figcaption>
+          <figcaption><span class="label">The 0.1 demo · sound on, headphones on</span>The original release with one source: Spotify moving around the listener while Valorant plays normally. Blurred for privacy.</figcaption>
         </figure>
         <ul class="facts">
           <li><span><b>Windows 11:</b> tested on real hardware.</span></li>
@@ -370,34 +370,37 @@
           <p class="label"><span class="tag-new"><span class="if-next">Coming next</span><span class="if-out">New</span></span>Production stills</p>
           <h3>Three sources, voice presets, a never-duck list.</h3>
         </div>
-        <p class="if-next">Screens of the next update go in these frames when it ships. Until then they hold <b>stand-ins from 0.1</b>, marked as such.</p>
+        <p>The multi-source update in demo mode, with simulated apps: Spotify behind you, Pocket Casts on your left, Discord on your right.</p>
       </div>
       <ul class="stills-grid">
-        <li class="still reveal" data-slot="sources">
+        <li class="still s-lead reveal">
           <figure class="shot">
-            <div class="frame">
-              <img src="media/screenshot-light.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1 in its light theme, with Spotify behind the listener on the radar.">
-              <span class="standin">0.1 stand-in</span>
-            </div>
-            <figcaption><b>Several sources at once</b>Shown for now: 0.1 in its light theme, with one source.</figcaption>
+            <div class="frame"><img src="media/screenshot-sources.png" width="1500" height="990" loading="lazy" decoding="async" alt="Sidestage with three sources: Spotify behind the listener in violet, Pocket Casts on the left in teal and Discord on the right in coral. The source list shows 3 of 8, the presets have Music and Voice tabs, and the status line reads 3 sources, 48 kHz, 0 dropouts, originals hidden."></div>
+            <figcaption><b>Up to 8 sources at once</b>Each with its own place on the radar, its own colour and its own preset.</figcaption>
           </figure>
         </li>
-        <li class="still reveal" data-slot="voice" style="--d:.08s">
+        <li class="still s-side reveal" style="--d:.08s">
           <figure class="shot">
-            <div class="frame">
-              <img src="media/screenshot-ducking.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1's sound sliders and ducking controls, with the live game level.">
-              <span class="standin">0.1 stand-in</span>
-            </div>
-            <figcaption><b>Voice presets for Discord</b>Shown for now: 0.1's sound and ducking controls.</figcaption>
+            <div class="frame"><img src="media/screenshot-voice.png" width="1500" height="990" loading="lazy" decoding="async" alt="Discord selected with the Voice presets tab open: Voice chat left, Voice chat right, Over your shoulder, Radio comms and Podcast left, and the Voice chat switch that turns the other sources down while it talks."></div>
+            <figcaption><b>Voice presets for Discord</b>Levelled, clarified, never ducked for the game.</figcaption>
           </figure>
         </li>
-        <li class="still reveal" data-slot="never-duck" style="--d:.16s">
+        <li class="still s-side reveal" style="--d:.16s">
           <figure class="shot">
-            <div class="frame">
-              <img src="media/screenshot-diagnostics.png" width="1500" height="990" loading="lazy" decoding="async" alt="Stand-in: Sidestage 0.1's Diagnostics window with latency, dropouts and clock drift.">
-              <span class="standin">0.1 stand-in</span>
-            </div>
-            <figcaption><b>Never duck for these apps</b>Shown for now: 0.1's Diagnostics window.</figcaption>
+            <div class="frame"><img src="media/screenshot-never-duck.png" width="1500" height="990" loading="lazy" decoding="async" alt="The ducking controls: Turn down while voice chat talks, when Discord talks; live Game, Voice and Turned down meters; and the Never duck for these apps list with Firefox and System sounds."></div>
+            <figcaption><b>Turn down while voice chat talks</b>And a never-duck list for apps that shouldn't count as the game.</figcaption>
+          </figure>
+        </li>
+        <li class="still s-half reveal">
+          <figure class="shot">
+            <div class="frame"><img src="media/screenshot-add-source.png" width="1500" height="990" loading="lazy" decoding="async" alt="The Add a source picker: a list of apps playing audio, with Discord, Pocket Casts and Spotify marked as added."></div>
+            <figcaption><b>Add a source</b>Click an app to add it; it gets a preset that suits it.</figcaption>
+          </figure>
+        </li>
+        <li class="still s-half reveal" style="--d:.08s">
+          <figure class="shot">
+            <div class="frame"><img src="media/screenshot-crowd.png" width="1500" height="990" loading="lazy" decoding="async" alt="Four sources on the radar: Spotify behind, Pocket Casts and Firefox on the left, Discord on the right, each with its own colour."></div>
+            <figcaption><b>A crowd around you</b>Four sources, all clear of the game's wedge in front of you.</figcaption>
           </figure>
         </li>
       </ul>
@@ -461,6 +464,11 @@
       <details>
         <summary>Does it work on speakers?</summary>
         <p>No. Sidestage renders binaural audio, which needs one channel per ear. On speakers the 3D effect falls apart.</p>
+      </details>
+      <details>
+        <summary>How many apps can it place at once?</summary>
+        <p class="if-next">Version 0.1 places one. The next update places up to 8 at once, each with its own position and preset, plus voice presets for Discord.</p>
+        <p class="if-out">Up to 8 at once, each with its own position and preset. Voice chat gets its own presets, tuned for Discord.</p>
       </details>
       <details>
         <summary>Does Sidestage touch my game?</summary>

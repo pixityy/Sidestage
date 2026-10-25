@@ -24,12 +24,9 @@ Then open <http://127.0.0.1:8770/>. The script serves `website/` at `/` and `doc
 
 ## When the multi-source update ships
 
-1. In `index.html`, change `<html lang="en" data-update="next">` to `data-update="out"`. That swaps
-   every "Next update" badge and sentence for its released wording.
-2. Put the new screenshots in `docs/media/` and point the three frames under "Production stills"
-   (`<li class="still" data-slot="...">`) at them. In each one, replace the `img` `src`, `alt`,
-   `width` and `height`, delete the `<span class="standin">`, rewrite the `figcaption`, and add the
-   class `final` to the `li`.
+In `index.html`, change `<html lang="en" data-update="next">` to `data-update="out"`. That swaps
+every "coming next" tag and sentence for its released wording. The production stills already show
+the update (demo-mode screenshots from `docs/media/`).
 
 ## How it is published
 

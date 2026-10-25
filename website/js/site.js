@@ -41,8 +41,8 @@ function el(tag, attrs, parent) {
 const stop = (g, off, v, a) => el('stop', {offset: off, style: `stop-color:var(${v});stop-opacity:${a}`}, g);
 const KIND = {
   music: ['--accent-hi', '--accent', '--accent-deep'],
-  voice: ['--ok-hi', '--ok', '--ok-deep'],
-  pod: ['--light-hi', '--light', '--light-deep'],
+  voice: ['--c-voice-hi', '--c-voice', '--c-voice-deep'],
+  pod: ['--c-pod-hi', '--c-pod', '--c-pod-deep'],
 };
 
 /* ---------------------------------------------------------------- builders */
@@ -374,7 +374,7 @@ function voiceLoop() {
   if (live()) {
     const n = 2 + Math.floor(Math.random() * 2);
     voice.P.g.classList.add('speaking');
-    for (let i = 0; i < n; i++) setTimeout(() => emitWave(H.waves, voice.P.x, voice.P.y, '--ok', {r0: 19, r1: 640, dur: 6400, op: .38}), i * 430);
+    for (let i = 0; i < n; i++) setTimeout(() => emitWave(H.waves, voice.P.x, voice.P.y, '--c-voice', {r0: 19, r1: 640, dur: 6400, op: .38}), i * 430);
     setTimeout(() => voice.P.g.classList.remove('speaking'), n * 430 + 420);
   }
   setTimeout(voiceLoop, 3800 + Math.random() * 2600);
@@ -383,7 +383,7 @@ function startIdle() {
   if (RM) return;
   H.svg.classList.add('idle');
   loop(() => emitWave(H.waves, music.P.x, music.P.y, '--accent', {r0: 18, r1: 780, dur: 7200, op: .42}), 2857);
-  setTimeout(() => loop(() => emitWave(H.waves, pod.P.x, pod.P.y, '--light', {r0: 18, r1: 720, dur: 7800, op: .34}), 4400), 1400);
+  setTimeout(() => loop(() => emitWave(H.waves, pod.P.x, pod.P.y, '--c-pod', {r0: 18, r1: 720, dur: 7800, op: .34}), 4400), 1400);
   setTimeout(voiceLoop, 2300);
   setTimeout(() => loop(heroDuck, 9600), 1500);
 }
@@ -725,7 +725,7 @@ function demoFrame(now) {
   if (ducking && now - lastDuck > 455) { duckRing(dMusic.P); lastDuck = now; }
   if (demoVisible) {
     if (lay.music && now - lastBar > 2857) { emitWave(D.waves, dMusic.P.x, dMusic.P.y, '--accent', {r0: 18, r1: 680, dur: 5600, op: .42}); lastBar = now; }
-    if (talking && now - lastTalk > 430) { emitWave(D.waves, dVoice.P.x, dVoice.P.y, '--ok', {r0: 19, r1: 520, dur: 5200, op: .34}); lastTalk = now; }
+    if (talking && now - lastTalk > 430) { emitWave(D.waves, dVoice.P.x, dVoice.P.y, '--c-voice', {r0: 19, r1: 520, dur: 5200, op: .34}); lastTalk = now; }
   }
   const t = audio.now;
   while (audio.events.length && audio.events[0].t <= t) {
