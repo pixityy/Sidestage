@@ -54,7 +54,7 @@ h1,h2,h3{margin:0}
   radial-gradient(40vmax 34vmax at 6% 92%, color-mix(in srgb, var(--info) 6%, transparent), transparent 70%),
   radial-gradient(70vmax 50vmax at 50% 118%, color-mix(in srgb, var(--accent-strong) 11%, transparent), transparent 70%),
   var(--stage)}
-.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.07;mix-blend-mode:soft-light;
+.grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.035;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 
 /* Type */
@@ -200,8 +200,8 @@ h1 .w{display:inline-block}
 
 /* Label chips (HTML, so they stay legible at any radar size) */
 .chip{position:absolute;z-index:3;display:flex;align-items:center;gap:9px;padding:7px 11px 7px 9px;border-radius:9px;white-space:nowrap;pointer-events:none;
-  background:color-mix(in srgb, var(--surface) 84%, transparent);border:1px solid color-mix(in srgb, var(--c) 38%, var(--border));
-  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 10px 30px -14px color-mix(in srgb, var(--c) 60%, transparent);
+  background:color-mix(in srgb, var(--surface) 96%, transparent);border:1px solid color-mix(in srgb, var(--c) 38%, var(--border));
+  box-shadow:0 10px 30px -14px color-mix(in srgb, var(--c) 60%, transparent);
   font-family:var(--font-mono);font-size:.6875rem;line-height:1.3;font-stretch:87.5%;
   transform:translate(var(--tx, -50%), var(--ty, 0)) translateY(var(--dy, 8px));opacity:0;transition:opacity .6s ease, transform .7s var(--ease)}
 .chip.on{opacity:1;--dy:0px}
@@ -227,12 +227,10 @@ h1 .w{display:inline-block}
   font-family:var(--font-mono);font-size:.625rem;font-weight:600;font-stretch:87.5%;letter-spacing:.14em;text-transform:uppercase;vertical-align:1px}
 
 /* Hero load sequence (text) */
-.js .rise{animation:rise .9s var(--ease) both;animation-delay:var(--d, 0ms)}
+.js .rise{animation:rise .9s var(--ease) backwards;animation-delay:var(--d, 0ms)}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-.js h1 .w{animation:wordIn 1.15s var(--ease) both;animation-delay:calc(160ms + var(--i) * 75ms)}
-.js h1 .w.wings{animation:wordIn 1.15s var(--ease) both, wingBreath 5.6s ease-in-out infinite alternate;animation-delay:calc(160ms + var(--i) * 75ms), 2.6s}
-@keyframes wordIn{from{opacity:0;transform:translateY(.32em);font-weight:300;font-stretch:75%;filter:blur(8px)}to{opacity:1;transform:none;font-weight:700;font-stretch:90%;filter:blur(0)}}
-@keyframes wingBreath{from{font-stretch:90%;letter-spacing:-.025em}to{font-stretch:100%;letter-spacing:.012em}}
+.js h1 .w{animation:wordIn 1.15s var(--ease) backwards;animation-delay:calc(160ms + var(--i) * 75ms)}
+@keyframes wordIn{from{opacity:0;transform:translateY(.32em);font-weight:300;font-stretch:75%;filter:blur(8px)}to{opacity:1;transform:none;font-weight:700;font-stretch:90%;filter:none}}
 
 @media (max-width:980px){
   .hero{padding-top:96px;min-height:0}
@@ -405,8 +403,8 @@ figcaption .label{display:block;margin-bottom:4px}
 .stage-light{position:absolute;left:50%;top:-10%;width:min(1100px, 140vw);height:900px;transform:translateX(-50%);pointer-events:none;z-index:-1;
   background:radial-gradient(50% 60% at 50% 0%, color-mix(in srgb, var(--light) 9%, transparent), transparent 75%)}
 .platforms{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:16px;margin-top:8px}
-.plat{position:relative;display:flex;flex-direction:column;padding:24px;border-radius:var(--r-card);background:color-mix(in srgb, var(--surface) 88%, transparent);border:1px solid var(--border);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:border-color .3s, transform .3s var(--ease)}
+.plat{position:relative;display:flex;flex-direction:column;padding:24px;border-radius:var(--r-card);background:color-mix(in srgb, var(--surface) 96%, transparent);border:1px solid var(--border);
+  transition:border-color .3s, transform .3s var(--ease)}
 .plat:hover{transform:translateY(-2px);border-color:color-mix(in srgb, var(--accent) 45%, var(--border))}
 .plat.mine{border-color:color-mix(in srgb, var(--accent) 65%, var(--border));box-shadow:0 30px 80px -40px color-mix(in srgb, var(--accent) 80%, transparent)}
 .plat-top{display:flex;align-items:center;justify-content:space-between;gap:12px}

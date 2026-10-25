@@ -734,8 +734,10 @@ function demoFrame(now) {
     // Where the game's own stereo mix puts the sound: inside the wedge, never moved.
     const shot = ev.kind === 'shot', p = pos(ev.pan * 70, shot ? 9 : 5);
     emitWave(D.fx, p[0], p[1], '--info', shot ? {r0: 3, r1: 64, dur: 900, op: .95, ease: 'cubic-bezier(.1,.7,.3,1)'} : {r0: 3, r1: 34, dur: 800, op: .9, ease: 'cubic-bezier(.1,.7,.3,1)'});
-    dsvg.classList.add('game-loud');
-    setTimeout(() => dsvg.classList.remove('game-loud'), shot ? 260 : 140);
+    if (shot) {
+      dsvg.classList.add('game-loud');
+      setTimeout(() => dsvg.classList.remove('game-loud'), 260);
+    }
   }
   demoRAF = requestAnimationFrame(demoFrame);
 }
