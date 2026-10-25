@@ -2,7 +2,7 @@
 // radar follows the app's geometry (crates/sidestage/src/ui/radar.rs): log distance rings from
 // 0.5 to 20 m, the GAME wedge of +-60 degrees in front, angle 0 straight ahead, +90 to the right.
 
-import {DemoAudio, supported} from './audio.js';
+import {DemoAudio, supported} from './audio.js?v=dev';
 
 const doc = document, root = doc.documentElement;
 const $ = (s, r = doc) => r.querySelector(s);

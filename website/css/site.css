@@ -65,7 +65,7 @@ h1,h2,h3{margin:0}
 .display{font-family:var(--font-display);font-weight:700;font-stretch:90%;letter-spacing:-.025em}
 
 /* ------------------------------------------------------------------------------- Nav */
-.nav{position:fixed;top:0;left:0;right:0;z-index:50;height:64px;display:flex;align-items:center;border-bottom:1px solid transparent;transition:background-color .35s, border-color .35s, backdrop-filter .35s}
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;height:64px;display:flex;align-items:center;border-bottom:1px solid transparent;transition:background-color .35s, border-color .35s}
 .nav.scrolled{background:color-mix(in srgb, var(--stage) 74%, transparent);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);border-bottom-color:color-mix(in srgb, var(--border) 75%, transparent)}
 .nav-inner{width:100%;max-width:var(--wrap);margin:0 auto;padding:0 var(--gutter);display:flex;align-items:center;gap:20px}
 .brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--font-display);font-weight:650;font-size:1.25rem;font-stretch:94%;letter-spacing:-.012em;line-height:1}
@@ -135,7 +135,7 @@ h1 .w{display:inline-block}
 .fring{fill:none;stroke:var(--text);stroke-width:1;vector-effect:non-scaling-stroke;transform-box:fill-box;transform-origin:center}
 .spoke{stroke:var(--text);stroke-opacity:.03;stroke-width:1;vector-effect:non-scaling-stroke}
 .wedge{fill:var(--info);fill-opacity:.07;transition:fill-opacity .6s ease}
-.game-loud .wedge{fill-opacity:.15;transition:fill-opacity .1s}
+.game-loud .wedge{fill-opacity:.13;transition:fill-opacity .25s}
 .wedge-edge{stroke:var(--info);stroke-opacity:.18;stroke-width:1;vector-effect:non-scaling-stroke}
 .game-label{fill:var(--info);fill-opacity:.75;font-family:var(--font-mono);font-weight:500;letter-spacing:.14em}
 .rl rect{fill:var(--stage)}
@@ -164,21 +164,21 @@ h1 .w{display:inline-block}
 .puck-voice .gl-s,.puck-pod .gl-s{stroke:var(--on-warm)}
 .puck-voice .gl-cut{fill:var(--c-voice)}
 .p-duck{fill:none;stroke:var(--warn);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0}
-.p-speak{fill:none;stroke:var(--c-voice);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;transition:opacity .15s}
+.p-speak{fill:none;stroke:var(--c-voice);stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;transition:opacity .35s}
 .speaking .p-speak{opacity:.95}
 .p-core{transition:opacity .3s ease}
-.ducked .p-core{opacity:.6;transition:opacity .08s}
+.ducked .p-core{opacity:.62;transition:opacity .3s}
 .p-focus{fill:none;stroke:var(--text);stroke-width:2;stroke-dasharray:4 4;vector-effect:non-scaling-stroke;opacity:0}
 .puck:focus{outline:none}
 .puck:focus-visible .p-focus{opacity:1}
 .puck:focus-visible .p-body{stroke:var(--text);stroke-width:2.5}
 .pop.landed{animation:pop .7s cubic-bezier(.3,1.7,.5,1) both}
 @keyframes pop{0%{transform:scale(1.32)}100%{transform:scale(1)}}
-.idle .puck-music .p-glow{animation:beat 1.4286s cubic-bezier(.2,.7,.4,1) infinite}
+.idle .puck-music .p-glow{animation:beat 1.4286s ease-in-out infinite}
 .idle .puck-pod .p-glow{animation:breathe 4.4s ease-in-out infinite alternate}
 .idle .puck-voice .p-glow{transition:transform .3s ease, opacity .3s}
 .idle .puck-voice:not(.speaking) .p-glow{transform:scale(.88);opacity:.75}
-@keyframes beat{0%{transform:scale(1.14);opacity:1}100%{transform:scale(.94);opacity:.72}}
+@keyframes beat{0%,100%{transform:scale(.94);opacity:.72}18%{transform:scale(1.12);opacity:1}}
 @keyframes breathe{from{transform:scale(.9);opacity:.72}to{transform:scale(1.08);opacity:1}}
 
 /* Intro choreography for radar parts */
@@ -220,7 +220,7 @@ h1 .w{display:inline-block}
 .sb-game i{background:var(--info)}
 .sb-duck{color:var(--text-faint)}
 .sb-duck i{border:1.5px solid currentColor}
-.sb-duck.on{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 55%, transparent);box-shadow:0 0 22px -6px color-mix(in srgb, var(--warn) 70%, transparent);transition:none}
+.sb-duck.on{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 55%, transparent);box-shadow:0 0 22px -6px color-mix(in srgb, var(--warn) 70%, transparent)}
 .sb-duck.on i{background:var(--warn);border-color:var(--warn)}
 .stage-note{text-align:center;margin:14px auto 0;max-width:36em;font-size:.8125rem;line-height:1.5;color:var(--text-dim)}
 .tag-new{display:inline-block;margin-right:6px;padding:2px 7px;border-radius:5px;border:1px solid color-mix(in srgb, var(--accent) 50%, transparent);background:color-mix(in srgb, var(--accent) 14%, transparent);color:var(--accent-hi);
