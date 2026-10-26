@@ -26,9 +26,21 @@ peak, footsteps to -10, shots to -12), so the files only need to be clean and tr
 Mono WAV or FLAC at 44.1 or 48 kHz is best; they get converted to small MP3s for the site.
 Each clip in its own file, trimmed to about 0.1 s of silence at each end.
 
-Only use sounds you may publish: your own recordings (and friends who agree), or CC0 / public
-domain libraries.
+Only use sounds you may publish: your own recordings (and friends who agree), CC0 / public
+domain libraries, or CC BY sounds credited in the sound check's credits line.
 
 The game layer plays the clips in the game's own stereo position (an enemy crossing in front of
 you) and never through the 3D stage. The voice is placed in 3D like a Discord source in
 Sidestage, and the music turns down a little while it talks.
+
+## What's here now
+
+| Files | Source | Licence |
+|---|---|---|
+| `voice-01.mp3` to `voice-05.mp3` | Recorded for Sidestage by the project owner | Owner's own recordings |
+| `step-01.wav` to `step-05.wav` | Kenney, [Impact Sounds](https://kenney.nl/assets/impact-sounds) 1.0, `footstep_concrete_000` to `004`: converted to 24 kHz mono WAV and trimmed | CC0 |
+| `shot-01.wav` to `shot-05.wav` | Vincent Sevedge (Tabasco), [Gunshot Sounds](https://opengameart.org/content/gunshot-sounds): single shots cut from `mosin.wav` (01 to 03) and `cz.wav` (04, 05), high-passed, faded out over 0.45 s, 24 kHz mono | CC BY 3.0 (the licence file in the download says so, although the OpenGameArt page says CC0), so the sound check credits him |
+
+The voice lines are played without their silent ends: the page trims anything 40 dB below a
+clip's peak at the start and end when it loads it.
+

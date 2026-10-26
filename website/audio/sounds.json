@@ -1,5 +1,23 @@
 {
-  "voice": [],
-  "steps": [],
-  "shots": []
+  "voice": [
+    "voice-01.mp3",
+    "voice-02.mp3",
+    "voice-03.mp3",
+    "voice-04.mp3",
+    "voice-05.mp3"
+  ],
+  "steps": [
+    "step-01.wav",
+    "step-02.wav",
+    "step-03.wav",
+    "step-04.wav",
+    "step-05.wav"
+  ],
+  "shots": [
+    "shot-01.wav",
+    "shot-02.wav",
+    "shot-03.wav",
+    "shot-04.wav",
+    "shot-05.wav"
+  ]
 }

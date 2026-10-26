@@ -538,3 +538,5 @@ html[data-update="next"] .if-out,html[data-update="out"] .if-next{display:none!i
 .np-foot{grid-area:foot;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin:0;font-family:var(--font-mono);font-size:.6875rem;font-stretch:87.5%;color:var(--text-faint)}
 .np-foot a{color:var(--text-dim);text-underline-offset:3px}
 .np-foot a:hover{color:var(--text)}
+.credits{margin:10px 0 0;font-size:.75rem;line-height:1.5;color:var(--text-faint)}
+.credits a{color:var(--text-dim);text-underline-offset:2px}

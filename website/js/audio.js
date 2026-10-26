@@ -404,7 +404,8 @@ export class DemoAudio {
     const load = async (file, peakDb) => {
       const r = await fetch(new URL(file, base));
       const buf = await this.ctx.decodeAudioData(await r.arrayBuffer());
-      return { buf, gain: db(peakDb) / Math.max(1e-4, peakOf(buf)) };
+      const [offset, length] = trimOf(buf);
+      return { buf, offset, length, gain: db(peakDb) / Math.max(1e-4, peakOf(buf)) };
     };
     for (const [key, peakDb] of [['voice', VOICE_PEAK_DB], ['steps', STEP_PEAK_DB], ['shots', SHOT_PEAK_DB]]) {
       const files = Array.isArray(list[key]) ? list[key] : [];
@@ -413,15 +414,15 @@ export class DemoAudio {
     }
   }
 
-  /** Play a clip into `dest` at `t`; returns its length in seconds. */
+  /** Play a clip (without its silent ends) into `dest` at `t`; returns its length in seconds. */
   #clip(c, t, dest, { gain = 1, rate = 1 } = {}) {
     const src = this.ctx.createBufferSource();
     src.buffer = c.buf;
     src.playbackRate.value = rate;
     const g = this.#gain(c.gain * gain);
     src.connect(g).connect(dest);
-    src.start(t);
-    return c.buf.duration / rate;
+    src.start(t, c.offset, c.length);
+    return c.length / rate;
   }
 
   // ---- sequencing ----------------------------------------------------------------------------
@@ -471,7 +472,8 @@ export class DemoAudio {
     this.duck.gain.setTargetAtTime(db(-5), t, 0.08);
     this.duck.gain.setTargetAtTime(1, end + 0.25, 0.25);
     this.#flag('talking', t, end + 0.25);
-    return end + 1.4 + Math.random() * 2.2;
+    // A handful of lines: generous gaps keep them from repeating too often.
+    return end + (this.clips.voice.length ? 2.8 + Math.random() * 3 : 1.4 + Math.random() * 2.2);
   }
 
   /** The stand-in voice: a buzzy source through three formant filters. Returns its end time. */
@@ -536,8 +538,9 @@ export class DemoAudio {
     let end = t + steps * gap;
     if (this.walks % 3 === 0) {
       const at0 = end + 0.35;
+      let at = at0;
       for (let i = 0; i < 3; i++) {
-        const at = at0 + i * 0.13;
+        if (i) at += this.clips.shots.length ? 0.22 + Math.random() * 0.14 : 0.13;
         this.events.push({ t: at, kind: 'shot', pan: 0.65 * dir });
         if (this.clips.shots.length) {
           this.#clip(pick(this.clips.shots), at, this.gBus, { gain: 0.9 + Math.random() * 0.1 });
@@ -545,7 +548,7 @@ export class DemoAudio {
           this.#noiseHit(at, this.gBus, 'lowpass', 2600, 0.6, 0.5, 0.16);
         }
       }
-      end = at0 + 0.5;
+      end = at + 0.6;
       // A loud moment: the music ducks for the game (Standard ducking).
       this.duck.gain.setTargetAtTime(db(-8), at0, 0.02);
       this.duck.gain.setTargetAtTime(1, end + 0.15, 0.2);
@@ -571,6 +574,20 @@ function rmsOf(buf) {
     n += Math.ceil(d.length / 4);
   }
   return Math.sqrt(sum / Math.max(1, n));
+}
+
+/** [offset, length] in seconds of the part of a clip that isn't silence (40 dB under its peak). */
+function trimOf(buf) {
+  const d = buf.getChannelData(0);
+  const thr = Math.max(peakOf(buf) * db(-40), db(-70));
+  let a = 0;
+  let b = d.length - 1;
+  while (a < b && Math.abs(d[a]) < thr) a++;
+  while (b > a && Math.abs(d[b]) < thr) b--;
+  const sr = buf.sampleRate;
+  const from = Math.max(0, a / sr - 0.04);
+  const to = Math.min(buf.duration, b / sr + 0.15);
+  return [from, Math.max(0.01, to - from)];
 }
 
 function peakOf(buf) {
