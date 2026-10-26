@@ -1,17 +1,20 @@
 # sidestage.it.com
 
 The Sidestage website: plain static HTML, CSS and JavaScript modules with self-hosted fonts. It
-has no build step, no tracking, no cookies and no third-party requests.
+has no build step, no tracking and no cookies. The only third-party request is the sound check's
+music: a 30-second Spotify preview (and its cover), streamed once the visitor presses play.
 
 | Path | What |
 |---|---|
 | `index.html` | The page: hero, sound check, the cue sheet of features, proof (screenshot, demo video, stills), downloads, questions |
 | `css/site.css` | All styles. Colours are the app's dark palette from `crates/sidestage/src/ui/theme.rs` |
 | `js/site.js` | The radar (the same geometry as the app's `radar.rs`), the hero's entrance and idle motion, the sound check's radar and controls, reveals and the download highlight |
-| `js/audio.js` | The sound check's sound, made with Web Audio: a music loop and a voice through HRTF panners, game footsteps played straight |
+| `js/audio.js` | The sound check's sound in Web Audio: Spotify previews and a voice through HRTF panners, game footsteps and shots played straight |
+| `js/tracks.js`, `tracks.py` | The Spotify tracks the sound check rotates through; `python website/tracks.py` regenerates the list (edit the links there) |
+| `audio/` | Recorded voice lines and game sounds, listed in `audio/sounds.json` (see `audio/README.md`) |
 | `fonts/` | Bricolage Grotesque, Onest and Martian Mono (latin subsets) with their OFL licences |
 | `404.html`, `favicon.svg`, `CNAME` | Pages extras |
-| `serve.py` | Local preview server; not published |
+| `serve.py` | Local preview server; not published (no `.py` file is) |
 
 ## Preview locally
 

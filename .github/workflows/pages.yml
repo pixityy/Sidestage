@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p _site/media
           cp -R website/. _site/
-          rm -f _site/serve.py _site/README.md
+          rm -f _site/*.py _site/README.md _site/audio/README.md
           # Stamp the CSS and JS links with the commit, so browsers never mix old and new files.
           sed -i "s/?v=dev/?v=${GITHUB_SHA::7}/g" _site/index.html _site/404.html _site/js/site.js
           cp docs/media/*.png docs/media/*.jpg docs/media/*.mp4 _site/media/

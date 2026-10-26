@@ -120,7 +120,7 @@
     <div class="sec-head">
       <p class="label"><span class="n">01</span> · Hear it in your browser</p>
       <h2 class="kin" id="hear-title">Move the music. The footsteps stay put.</h2>
-      <p class="reveal">Press play: a lo-fi loop comes from the violet puck and a friend murmurs from the coral one. Drag them anywhere around your head. The game's footsteps cross in front of you and skip the 3D stage completely, the same way your real game skips Sidestage.</p>
+      <p class="reveal">Press play: a Spotify preview plays from the violet puck and a friend talks from the coral one. Drag them anywhere around your head. The game's footsteps cross in front of you and skip the 3D stage completely, the same way your real game skips Sidestage.</p>
     </div>
 
     <div class="demo-grid" id="soundcheck">
@@ -145,10 +145,24 @@
             <svg class="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>
             <svg class="i-pause" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="5" width="4.2" height="14" rx="1.2"/><rect fill="currentColor" x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
           </span>
-          <span><span id="play-label">Play the sound check</span><small id="play-sub">Synthesized live in this page</small></span>
+          <span><span id="play-label">Play the sound check</span><small id="play-sub">Streams a 30-second Spotify preview</small></span>
         </button>
         <p class="hp-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 15v-3a8 8 0 0116 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.6"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6"/></svg><span><b>Use headphones.</b> Binaural 3D doesn't work on speakers.</span></p>
         <p class="unsupported" id="unsupported" hidden>This browser can't play Web Audio, so the sound check stays silent here. The radar still moves.</p>
+
+        <div class="np" id="np">
+          <div class="np-art" aria-hidden="true"><img id="np-cover" alt="" width="64" height="64" decoding="async"></div>
+          <div class="np-meta">
+            <p class="np-src"><i aria-hidden="true"></i><span id="np-state">Spotify preview · 30 s</span></p>
+            <p class="np-title"><span id="np-title">Track</span><abbr class="np-e" id="np-e" title="Explicit">E</abbr></p>
+            <p class="np-artist" id="np-artist">Artist</p>
+          </div>
+          <button class="np-skip" id="np-skip" type="button" aria-label="Next track">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 6.2v11.6a.8.8 0 0 0 1.25.66L14.5 13v4.8a.8.8 0 0 0 1.25.66l.25-.17V6.7l-.25-.17A.8.8 0 0 0 14.5 7.2V11L6.25 5.54A.8.8 0 0 0 5 6.2z"/><rect fill="currentColor" x="17" y="5.5" width="2.2" height="13" rx=".8"/></svg>
+          </button>
+          <div class="np-bar" aria-hidden="true"><i id="np-prog"></i></div>
+          <p class="np-foot"><span id="np-count">Track 1 of 4</span><a id="np-link" href="https://open.spotify.com/" target="_blank" rel="noopener noreferrer">Open in Spotify</a></p>
+        </div>
 
         <div class="p-sec">
           <p class="label" id="ro-who">Music position</p>
@@ -168,11 +182,11 @@
           <p class="label">On stage</p>
           <button class="tg" type="button" role="switch" aria-checked="true" data-layer="music">
             <span class="tg-knob" aria-hidden="true"></span>
-            <span><b>Music</b><small>A lo-fi loop, placed in 3D. It ducks when the game is loud or someone talks.</small></span>
+            <span><b>Music</b><small>A Spotify preview, placed in 3D. It ducks when the game is loud or someone talks.</small></span>
           </button>
           <button class="tg tg-voice" type="button" role="switch" aria-checked="true" data-layer="voice">
             <span class="tg-knob" aria-hidden="true"></span>
-            <span><b>Voice chat</b><small>A murmuring friend, placed in 3D and never ducked.</small></span>
+            <span><b>Voice chat</b><small>A friend on voice chat, placed in 3D and never ducked.</small></span>
           </button>
           <button class="tg tg-game" type="button" role="switch" aria-checked="true" data-layer="game">
             <span class="tg-knob" aria-hidden="true"></span>
@@ -189,7 +203,7 @@
             <button class="hold" id="bypass" type="button" aria-pressed="false">Hold to bypass <kbd>B</kbd></button>
           </div>
         </div>
-        <p class="honest"><b>An honest note:</b> everything here is synthesized on this page and placed with your browser's generic HRTF, not Sidestage's own renderer, and generic HRTFs often blur front and back. Treat it as a sketch of the idea; the app itself sounds different.</p>
+        <p class="honest"><b>An honest note:</b> the music is a 30-second preview that Spotify streams when you press play. Everything is placed with your browser's generic HRTF, not Sidestage's own renderer, and generic HRTFs often blur front and back. Treat it as a sketch of the idea; the app itself sounds different.</p>
       </div>
     </div>
   </div>
@@ -518,7 +532,7 @@
       <a href="https://github.com/pixityy/Sidestage/blob/main/docs/DESIGN.md">How it works</a>
       <a href="https://github.com/pixityy/Sidestage/issues">Report an issue</a>
     </nav>
-    <p class="fine">This site sets no cookies, runs no analytics and loads nothing from other sites. The app has no network code at all.</p>
+    <p class="fine">This site sets no cookies and runs no analytics. The only thing it loads from another site is the sound check's music, a Spotify preview, once you press play. The app has no network code at all.</p>
   </div>
 </footer>
 </div>

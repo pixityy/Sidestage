@@ -3,6 +3,7 @@
 // 0.5 to 20 m, the GAME wedge of +-60 degrees in front, angle 0 straight ahead, +90 to the right.
 
 import {DemoAudio, supported} from './audio.js?v=dev';
+import {TRACKS} from './tracks.js?v=dev';
 
 const doc = document, root = doc.documentElement;
 const $ = (s, r = doc) => r.querySelector(s);
@@ -421,7 +422,43 @@ const PRESETS = {
 const VOICE_HOME = {az: 90, el: 0, d: 1};
 const heightText = deg => { const r = Math.round(deg); return r === 0 ? '0°' : `${r > 0 ? '+' : '−'}${Math.abs(r)}°`; };
 
-const audio = new DemoAudio();
+const audio = new DemoAudio({tracks: TRACKS});
+// Rotate through the tracks: each visit starts on the one after the last one heard.
+const STORE = 'sidestage.track';
+try { audio.trackIndex = (+localStorage.getItem(STORE) || 0) % Math.max(1, TRACKS.length); } catch (e) { /* private mode */ }
+
+// The now-playing card. The cover comes from Spotify too, so it loads only once you press play.
+const np = {
+  cover: $('#np-cover'), title: $('#np-title'), artist: $('#np-artist'), e: $('#np-e'), state: $('#np-state'),
+  prog: $('#np-prog'), count: $('#np-count'), link: $('#np-link'), skip: $('#np-skip'), box: $('#np'),
+};
+let coversOn = false;
+function showTrack(i, state = 'idle') {
+  const t = TRACKS[i];
+  if (!t) { np.box.hidden = true; return; }
+  np.title.textContent = t.title;
+  np.artist.textContent = t.artists.join(', ');
+  np.e.hidden = !t.explicit;
+  np.link.href = t.url;
+  np.link.setAttribute('aria-label', `Open ${t.title} in Spotify`);
+  np.count.textContent = `Track ${i + 1} of ${TRACKS.length}`;
+  np.state.textContent = state === 'loading' ? 'Loading the preview…' : state === 'error' ? 'Preview unavailable, trying the next' : 'Spotify preview · 30 s';
+  np.box.dataset.state = state;
+  if (coversOn && t.cover && np.cover.getAttribute('src') !== t.cover) {
+    np.cover.classList.remove('on');
+    np.cover.src = t.cover;
+  }
+  if (state === 'playing') {
+    try { localStorage.setItem(STORE, String((i + 1) % TRACKS.length)); } catch (e) { /* private mode */ }
+  }
+}
+np.cover.addEventListener('load', () => np.cover.classList.add('on'));
+audio.onTrack = (i, state) => showTrack(i, state);
+np.skip.addEventListener('click', () => {
+  np.prog.style.transform = 'scaleX(0)';
+  audio.skip();
+});
+showTrack(audio.trackIndex);
 const demoWrap = $('#demo-wrap');
 const D = buildRadar($('#demo-radar'), 'd', {headphones: true, wedge: 60});
 const DF = buildField($('#demo-field'), false);
@@ -645,7 +682,8 @@ function syncUI() {
   const on = audio.running;
   playBtn.setAttribute('aria-pressed', String(on));
   playLabel.textContent = on ? 'Pause' : 'Play the sound check';
-  playSub.textContent = on ? 'Now playing · drag the pucks' : 'Synthesized live in this page';
+  playSub.textContent = on ? 'Now playing · drag the pucks' : 'Streams a 30-second Spotify preview';
+  if (on && !coversOn) { coversOn = true; showTrack(audio.trackIndex, np.box.dataset.state); }
   dRun.classList.toggle('on', on);
   dRun.lastChild.textContent = on ? 'Running' : 'Stopped';
   if (on && !demoRAF) demoRAF = requestAnimationFrame(demoFrame);
@@ -710,6 +748,8 @@ function demoFrame(now) {
     dDuck.classList.remove('on');
     return;
   }
+  const tt = audio.trackTime();
+  np.prog.style.transform = `scaleX(${(tt.position / tt.duration).toFixed(4)})`;
   const L = audio.levels();
   for (const s of DSRC) {
     lv[s.kind] += (L[s.kind] - lv[s.kind]) * 0.25;
